@@ -16,7 +16,8 @@ class DBLoader2NPY(tf.keras.utils.Sequence):
 
     def __init__(self, db_path, batch_size, angle_pose=True, no_hands=True,
                  maintain_memory=True, make_k_fold=False, k_fold_amount=None,
-                 const_none_angle_rep=-9999, const_none_xy_rep=(-9999, -9999)):
+                 const_none_angle_rep=-9999,
+                 const_none_xy_rep=np.array([-9999, -9999])):
         """
         Parameters
         ----------
@@ -25,7 +26,7 @@ class DBLoader2NPY(tf.keras.utils.Sequence):
 
         angle_pose : bool
             boleano para informar se carrega as poses XY ou em formato de
-            ângulo.
+            ângulo. True para pose em formato de ângulo, Falso para XY.
 
         no_hands : bool
             Caso exista pose das mãos.
@@ -163,10 +164,15 @@ class DBLoader2NPY(tf.keras.utils.Sequence):
             dataframe com nan preenchidos pelo valor padrão definido no
             construtor.
         """
-        return sample.fillna(self.const_none_angle_rep
-                             if self.angle_pose else self.const_none_xy_rep)
 
-    def __load_sample(self, class_name, num):
+        # No formato XY cada junta da pose é uma str de um np.array.
+        # Como vai ser convertido de str para vetor apos ser carregado, isso
+        # evita o erro do pandas não aceitar preencher nulos com um np.array.
+        xy_str_rep = str(self.const_none_xy_rep)
+        return sample.fillna(self.const_none_angle_rep
+                             if self.angle_pose else xy_str_rep)
+
+    def __load_sample(self, class_name, num, clean_nan=True):
         """
 
         Parameters
@@ -189,9 +195,24 @@ class DBLoader2NPY(tf.keras.utils.Sequence):
             dir_to_walk = os.path.join(x, self.angle_or_xy)
             cls_begin_pos += len(os.listdir(dir_to_walk))
 
-        return self.__load_sample_by_pos(cls_begin_pos + num)
+        return self.__load_sample_by_pos(cls_begin_pos + num,
+                                         clean_nan=clean_nan)
 
-    def __load_sample_by_pos(self, pos):
+    @staticmethod
+    def __parse_npy_vec_str(str_array_like):
+        if not isinstance(str_array_like, str):
+            return str_array_like
+
+        res = str_array_like[1:len(str_array_like) - 1].split(' ')
+        recovered_np_array = []
+        for r in res:
+            if r == '' or ' ' in r:
+                continue
+            f = float(r)
+            recovered_np_array.append(f)
+        return np.array(recovered_np_array)
+
+    def __load_sample_by_pos(self, pos, clean_nan=True):
         """
 
         Parameters
@@ -209,11 +230,23 @@ class DBLoader2NPY(tf.keras.utils.Sequence):
         if self.samples_memory[pos] is None and self.maintain_memory:
             sample = pd.read_csv(self.samples_path[pos][0])
             sample = sample.set_index('Unnamed: 0')
+            if clean_nan:
+                sample = self.__clean_sample(sample)
+
+            if not self.angle_pose:
+                sample = sample.applymap(self.__parse_npy_vec_str)
+
             self.samples_memory[pos] = sample
         elif self.samples_memory is not None and self.maintain_memory:
             sample = self.samples_memory[pos]
         else:
             sample = pd.read_csv(self.samples_path[pos][0])
+            sample = sample.set_index('Unnamed: 0')
+            if clean_nan:
+                sample = self.__clean_sample(sample)
+
+            if not self.angle_pose:
+                sample = sample.applymap(self.__parse_npy_vec_str)
 
         class_vec = np.zeros((len(self.cls_dirs), ))
         idx_test = self.samples_path[pos][1]
@@ -269,12 +302,7 @@ class DBLoader2NPY(tf.keras.utils.Sequence):
         X = []
         Y = []
         for idx in samples_idxs:
-            x, y = self.__load_sample_by_pos(idx)
-
-            if clean_nan:
-                x = self.__clean_sample(x)
-                if self.maintain_memory:
-                    self.samples_memory[idx] = x
+            x, y = self.__load_sample_by_pos(idx, clean_nan=clean_nan)
 
             X.append(x.values if as_npy else x)
             Y.append(y)
