@@ -7,7 +7,7 @@ from copy import copy
 import cv2 as cv
 
 
-class DBCutVideos:
+class AllEAFParser2CSV:
     def __init__(self, base_db_path):
         """
         Parameters
@@ -17,8 +17,11 @@ class DBCutVideos:
         videos e legendas respectivos de cada um.
         """
         # nome de todas as pastas presentes na base de dados.
+        res = os.listdir('.')
         self.estates_path_in_db = [os.path.join(base_db_path, x)
                                    for x in os.listdir(base_db_path)]
+        self.estates_path_in_db = list(filter(lambda x: os.path.isdir(x),
+                                              self.estates_path_in_db))
 
     def process(self):
         """
@@ -128,6 +131,7 @@ class DBCutVideos:
                             (signs['end'] == row['end']) &
                             (signs['sub'] == row['sub']) &
                             (signs['talker_id'] == row['talker_id'])]
+            print(ret.shape)
             if ret.shape[0] > 1:
                 signs.loc[ret['hand'].index, 'hand'] = 2
                 indexes_2_drop.append(ret.index[1])
@@ -191,15 +195,8 @@ class DBCutVideos:
                 proj_path = os.path.join(estates_path, proj_path)
 
                 proj_dirs = os.listdir(proj_path)
-                proj_dirs = list(map(lambda x: os.path.join(proj_path, x),
-                                     proj_dirs))
 
-                for item_path in proj_dirs:
-                    items_dir = os.listdir(item_path)
-                    items_dir = \
-                        list(map(lambda x: os.path.join(item_path, x),
-                                 items_dir))
-                    total_items += len(items_dir)
+                total_items += len(proj_dirs)
 
         yield total_items
 
@@ -258,5 +255,5 @@ class DBCutVideos:
 
 
 if __name__ == '__main__':
-    db_cut_videos = DBCutVideos('./db')
+    db_cut_videos = AllEAFParser2CSV('./db')
     db_cut_videos.process()
