@@ -8,7 +8,7 @@ import matplotlib.ticker as ticker
 import cv2 as cv
 
 
-db_path = 'all_videos.csv'
+db_path = '../all_videos.csv'
 sign_db = pd.read_csv(db_path)
 print(sign_db.head(n=10))
 
