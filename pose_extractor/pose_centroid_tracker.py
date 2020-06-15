@@ -29,9 +29,18 @@ class PoseCentroidTracker:
         self.body_parts = BODY_PARTS if body_parts is not None else body_parts
         self.hands_parts = HAND_PARTS if hand_parts is not None else hand_parts
         self.head_parts = head_parts
-
-    def register_persons_from_subtitle(self, subtitle_df, extractor):
-        pass
+        # essa variavel contem informação sobre os corpos, maos e cabeças das
+        # pessoas. A informção esta no seguinte formato:
+        # {
+        #   id: int,
+        #   centroid: np.array([x, y]),
+        #   right_hand_id: int.
+        #   left_hand_id: int
+        #   left_hand_centroid: int,
+        #   right_hand_centroid: int
+        # }
+        self.all_persons_all_parts_centroid = {}
+        self.last_persons_list = None
 
     def __make_persons_list(self, poses):
         """
@@ -50,8 +59,13 @@ class PoseCentroidTracker:
             persons_list.append(person)
         return persons_list
 
-    def update(self, poses):
-        pass
+    def update(self, datum):
+        new_persons_list = self.__make_persons_list(datum)
+        self.last_persons_list = self.minimize_by_centroid(new_persons_list) \
+            if self.last_persons_list is None else new_persons_list
+
+    def minimize_by_centroid(self, datum):
+        ]
 
     @staticmethod
     def make_xy_centroid(pose):

@@ -10,5 +10,7 @@ class TestFindSignalingCentroid:
         pass
 
     def test_find_centroid_each_singer_video(self):
-        folder_name = './db\\Alagoas\\Inventário de Libras Maceió\\Inventário Nacional de Libras - Surdos de Referência v1004\\v0.mp4'
+        folder_name = \
+            './db\\Alagoas\\Inventário de Libras Maceió\\' \
+            'Inventário Nacional de Libras - Surdos de Referência v1004\\v0.mp4'
         self.talk_cent_finder.find_each_signaler_frame_talks_alone(folder_name)
