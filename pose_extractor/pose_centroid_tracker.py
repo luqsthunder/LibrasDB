@@ -1,7 +1,12 @@
 import numpy as np
 import pandas as pd
+from copy import copy
 from pose_extractor.all_parts import BODY_PARTS, HAND_PARTS
+from pose_extractor.openpose_extractor import DatumLike
 
+
+class YOLOTracker:
+    pass
 
 class PoseCentroidTracker:
     """
@@ -11,7 +16,8 @@ class PoseCentroidTracker:
     esqueletos mais distantes que um limitante (threshold).
     """
 
-    def __init__(self, dist_threshold=20, persons_id=None, body_parts=None,
+    def __init__(self, body_dist_threshold=20, hand_dist_threshold=20,
+                 hand_body_dist_threshold=50, persons_id=None, body_parts=None,
                  hand_parts=None, head_parts=None):
         """
         Parameters
@@ -29,6 +35,10 @@ class PoseCentroidTracker:
         self.body_parts = BODY_PARTS if body_parts is not None else body_parts
         self.hands_parts = HAND_PARTS if hand_parts is not None else hand_parts
         self.head_parts = head_parts
+        self.body_dist_threshold = body_dist_threshold
+        self.hand_dist_threshold = hand_dist_threshold
+        self.hand_body_dist_threshold = hand_body_dist_threshold
+
         # essa variavel contem informação sobre os corpos, maos e cabeças das
         # pessoas. A informção esta no seguinte formato:
         # {
@@ -41,31 +51,188 @@ class PoseCentroidTracker:
         # }
         self.all_persons_all_parts_centroid = {}
         self.last_persons_list = None
+        self.last_hands_list = None
+        self.curr_dt = None
 
-    def __make_persons_list(self, poses):
+    def __registers_persons_from_sign_df(self, videos_df, folder_path):
+        pass
+
+    def __make_persons_list(self, dt):
+        """
+        É construido uma lista dicionarios com ID e centroid a partir do datum
+        passado. Nessa lista é construido sem levar em consideração os ID
+        corretos de cada pessoa. O intuito desse método é apenas organizar as
+        poses.
+
+        Parameters
+        ----------
+        dt: Openpose Datum
+            Datum contendo as poses a serem utilizadas
+
+        Returns
+        -------
+        List[dict]
+            Contém em cada dicionario as inforções do ID relacionado a posição
+            da pessoa no datum e o seu centroid.
+        """
+
+        persons_list = []
+        for it, body_pose in enumerate(dt.poseKeypoints):
+            person = {
+                'id': it,
+                'centroid': self.make_xy_centroid(body_pose)}
+            persons_list.append(person)
+        return persons_list
+
+    def __make_r_hands_list(self, dt: DatumLike):
+        """
+        É construido uma lista dicionarios com ID e centroid a partir do datum
+        passado. Nessa lista é construido sem levar em consideração os ID
+        corretos de cada pessoa. O intuito desse método é apenas organizar as
+        poses.
+
+        Parameters
+        ----------
+        dt: Openpose Datum
+            Datum contendo as poses a serem utilizadas
+
+        Returns
+        -------
+        List[dict]
+            Contém em cada dicionario as inforções do ID relacionado a posição
+            da pessoa no datum e o seu centroid.
+        """
+
+        hands_list = []
+        for it, hand_pose in enumerate(dt.handsKeypoints[0]):
+            hands = {
+                'id': it,
+                'centroid': self.make_xy_centroid(hand_pose)}
+            hands_list.append(person)
+        return hands_list
+
+    def __make_hands_lists(self, dt):
         """
         Parameters
         ----------
+        dt: Openpose Datum
+            Datum contendo as poses a serem utilizadas
 
         Returns
         -------
         """
 
-        persons_list = []
-        for it, persons in enumerate(poses.poseKeypoints):
+        hands_list = []
+        for it, hands in enumerate(dt.handKeypoints):
             person = {
                 'id': it,
-                'centroid': self.make_xy_centroid(poses.poseKeypoints[it])}
-            persons_list.append(person)
-        return persons_list
+                'centroid': self.make_xy_centroid(hands)}
+            hands_list.append(person)
+        return hands_list
 
-    def update(self, datum):
+    def update(self, datum: DatumLike):
+        self.curr_dt = copy(datum)
+        self.clean_current_datum()
+
         new_persons_list = self.__make_persons_list(datum)
-        self.last_persons_list = self.minimize_by_centroid(new_persons_list) \
+        self.last_persons_list = self.update_persons_list(new_persons_list) \
             if self.last_persons_list is None else new_persons_list
 
-    def minimize_by_centroid(self, datum):
-        ]
+        new_hands_list = self.__make_persons_list(datum)
+        self.last_hands_list = self.update_hands_list(new_hands_list) \
+            if self.last_persons_list is None else new_hands_list
+
+    def get_from_id_persons(self, person_id):
+        pass
+
+    def hand_owners_by_centroid(self):
+        pass
+
+    def clean_current_datum(self):
+        """
+        Nessa função é limpo os dados contidos no datum atual (self.curr_dt).
+        Removendo juntas que não são utilizadas e juntas com acuracia menor
+        que o limitante definido no contrutor.
+        """
+        pass
+
+    def update_persons_list(self, person_lists):
+        """
+        Atualiza a lista de pessoas baseado no centroid anterior e atual.
+
+        Nessa função é associado o centroid mais proximo da lista velha com os
+        novos calculados.
+
+        Parameters
+        ----------
+        person_lists: list
+
+        Returns
+        -------
+        persons: list
+            lista de pessoas com os seus respectivos id corrigidos e seus
+            centroides atuais.
+        """
+
+        persons = []
+        for old_person in self.last_persons_list:
+            failed_2_track = False
+            correct_pos_id, centroid, dist, _ = \
+                self.find_closest_centroid(person_lists,
+                                           old_person['centroid'])
+
+            if dist > self.body_dist_threshold:
+                centroid = old_person['centroid']
+                correct_pos_id = old_person['id']
+                failed_2_track = True
+
+            persons.append({
+                'id': correct_pos_id,
+                'centroid': centroid,
+                'failed': failed_2_track
+            })
+        return persons
+
+    @staticmethod
+    def find_closest_centroid(curr_persons_list, old_centroid):
+        """
+        Função para achar o centroid mais próximo das pessoas dentro da
+        curr_person_list em relação ao old_centroid
+
+        Parameters
+        ----------
+        curr_persons_list: list
+
+
+        old_centroid: np.array([x, y])
+
+        Returns
+        -------
+        closest_centroid: np.array([x, y]), correct_pos_id: int,
+        curr_person_dist: float
+            O closest_centroid indica o centroid mais proximo das pessoas
+            presentes na lista atual em relação ao antigo. O correct_pos_id é a
+            posição da pessoa correspondente ao centroid antigo na nova lista.
+            E curr_person_dist é a distância entre o centroid antigo e novo.
+
+        """
+        correct_pos_id = -1
+        curr_person_dist = 9999999
+        closest_centroid = None
+
+        for c_person in curr_persons_list:
+            if c_person['centroid'].size == 0:
+                continue
+
+            centroids_dist = \
+                np.linalg.norm(old_centroid - c_person['centroid'])
+
+            if centroids_dist < curr_person_dist:
+                curr_person_dist = centroids_dist
+                correct_pos_id = c_person['id']
+                closest_centroid = c_person['centroid']
+
+        return closest_centroid, correct_pos_id, curr_person_dist
 
     @staticmethod
     def make_xy_centroid(pose):
