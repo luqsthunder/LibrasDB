@@ -1,12 +1,12 @@
 import numpy as np
 import pandas as pd
+import cv2 as cv
 from copy import copy
 from pose_extractor.all_parts import BODY_PARTS, HAND_PARTS
-from pose_extractor.openpose_extractor import DatumLike
+from pose_extractor.openpose_extractor import DatumLike, OpenposeExtractor
+from pose_extractor.find_signaling_centroid import FindSignalingCentroid
+from pose_extractor.df_utils import update_xy_pose_df
 
-
-class YOLOTracker:
-    pass
 
 class PoseCentroidTracker:
     """
@@ -16,9 +16,10 @@ class PoseCentroidTracker:
     esqueletos mais distantes que um limitante (threshold).
     """
 
-    def __init__(self, body_dist_threshold=20, hand_dist_threshold=20,
-                 hand_body_dist_threshold=50, persons_id=None, body_parts=None,
-                 hand_parts=None, head_parts=None):
+    def __init__(self, all_video_csv_path, body_dist_threshold=20,
+                 hand_dist_threshold=20, hand_body_dist_threshold=50,
+                 persons_id=None, body_parts=None, hand_parts=None,
+                 head_parts=None):
         """
         Parameters
         ----------
@@ -42,20 +43,88 @@ class PoseCentroidTracker:
         # essa variavel contem informação sobre os corpos, maos e cabeças das
         # pessoas. A informção esta no seguinte formato:
         # {
-        #   id: int,
-        #   centroid: np.array([x, y]),
-        #   right_hand_id: int.
-        #   left_hand_id: int
-        #   left_hand_centroid: int,
-        #   right_hand_centroid: int
+        #   id: int,                    id principal, indicando a posição na
+        #                               legenda ou primeiro id registro para
+        #                               pessoa.
+        #
+        #   pos_id: int,                Posição da pose da pessoa no datum atual
+        #                               (self.curr_dt).
+        #
+        #   centroid: np.array([x, y]), centroid da pessoa.
+        #
+        #   right_hand_pos_id: int.     Posição da pose da mão direita da pessoa
+        #                               no datum atual.
+        #
+        #   left_hand_pos_id: int       Posição da pose da mão esquerda da
+        #                               pessoa no datum atual.
+        #
+        #   left_hand_centroid: int,    Centroid atual da mão esquerda.
+        #
+        #   right_hand_centroid: int    Centroid atual da mão direita.
         # }
         self.all_persons_all_parts_centroid = {}
+
         self.last_persons_list = None
         self.last_hands_list = None
         self.curr_dt = None
+        self.signaler_find = FindSignalingCentroid(all_video_csv_path)
+        openpose_path = '../../Libraries/repos/openpose/build'
+        self.pose_extractor = OpenposeExtractor(openpose_path=openpose_path)
 
-    def __registers_persons_from_sign_df(self, videos_df, folder_path):
-        pass
+    def register_persons_from_sign_df(self, folder_path):
+        persons_alone = \
+            self.signaler_find.find_where_signalers_talks_alone(folder_path)
+        # TODO:
+        # -  Extrair as poses rastreando cada uma na duração completa de cada
+        #    tempo. [ok]
+        # -  Localmente testa 5 frames.
+        # -  Remove o teste de 5 frames.
+        # -  Cria um ipython rodando tudo.
+        # -  Dentro do ipython deve ter uma célula para instalar o openpose.
+        # -  E roda completamente no colab.
+        video = cv.VideoCapture(folder_path)
+        pose_df_cols = ['person', 'frame']
+        pose_df_cols.extend(self.body_parts)
+        pose_df_cols.extend(self.hands_parts)
+        pose_df = pd.DataFrame(columns=pose_df_cols)
+        for person_sub_id, alone_talk in persons_alone.items():
+            video.set(cv.CAP_PROP_POS_FRAMES, alone_talk['beg'])
+            end_pos = alone_talk['end']
+            while video.get(cv.CAP_PROP_POS_FRAMES) <= end_pos:
+                ret, frame = video.read()
+                if not ret:
+                    raise RuntimeError(f'Video Ended Beforme was expected.'
+                                       f'The video is: {folder_path}')
+
+                dt = self.pose_extractor.extract_poses(frame)
+                # TODO:
+                # [ok] - extrai o X do centroid de cada pessoa e pega o valor
+                #        do meio como elas estão sentadas vc tem como dividir a
+                #        cena em 2 e ter menos trabalho para rastreamento.
+                #
+                # [  ] - Separa as pessoas pelo ponto do meio analisando o
+                #        centroid. Todas as duas pessoas presentes na cena,
+                #        são ordenadas da esquerda para direita.
+                #        Logo se o centroid anterior ao meio deve ser a
+                #        posição 0 e o a direita a posição 1.
+
+                persons_body_centroid = list(map(self.make_xy_centroid,
+                                                 dt.poseKeypoints))
+
+                persons_pos_id = []
+                x_mid_point = sum(map(lambda x: x[0], persons_body_centroid))
+                x_mid_point = x_mid_point / len(persons_body_centroid)
+                curr_frame = video.get(cv.CAP_PROP_POS_FRAMES)
+
+                # construindo o df com a posição relativa apenas a divisão da
+                # cena para falante da direita e falante da esquerda.
+                # para apos achar o que mais fala no tempo atual e atribuir
+                # a ele o ID correto que será o da legenda.
+                pose_df = update_xy_pose_df(dt, pose_df, curr_frame,
+                                            persons_pos_id[0],
+                                            self.body_parts,
+                                            self.hands_parts)
+
 
     def __make_persons_list(self, dt):
         """
@@ -108,7 +177,7 @@ class PoseCentroidTracker:
             hands = {
                 'id': it,
                 'centroid': self.make_xy_centroid(hand_pose)}
-            hands_list.append(person)
+            hands_list.append(hands)
         return hands_list
 
     def __make_hands_lists(self, dt):
@@ -130,7 +199,15 @@ class PoseCentroidTracker:
             hands_list.append(person)
         return hands_list
 
-    def update(self, datum: DatumLike):
+    def __remove_unused_joints(self, dt: DatumLike):
+        """
+        param: dt
+
+        returns:
+        """
+        pass
+
+    def update(self, datum: DatumLike, curr_frame):
         self.curr_dt = copy(datum)
         self.clean_current_datum()
 
@@ -142,18 +219,11 @@ class PoseCentroidTracker:
         self.last_hands_list = self.update_hands_list(new_hands_list) \
             if self.last_persons_list is None else new_hands_list
 
+
     def get_from_id_persons(self, person_id):
         pass
 
     def hand_owners_by_centroid(self):
-        pass
-
-    def clean_current_datum(self):
-        """
-        Nessa função é limpo os dados contidos no datum atual (self.curr_dt).
-        Removendo juntas que não são utilizadas e juntas com acuracia menor
-        que o limitante definido no contrutor.
-        """
         pass
 
     def update_persons_list(self, person_lists):
@@ -163,13 +233,9 @@ class PoseCentroidTracker:
         Nessa função é associado o centroid mais proximo da lista velha com os
         novos calculados.
 
-        Parameters
-        ----------
-        person_lists: list
+        param: person_lists: list
 
-        Returns
-        -------
-        persons: list
+        return: persons: list
             lista de pessoas com os seus respectivos id corrigidos e seus
             centroides atuais.
         """

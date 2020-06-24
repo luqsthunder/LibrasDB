@@ -1,6 +1,5 @@
 import pandas as pd
 import numpy as np
-from pose_extractor.pose_centroid_tracker import PoseCentroidTracker
 
 
 class FindSignalingCentroid:
@@ -8,14 +7,31 @@ class FindSignalingCentroid:
     def __init__(self, all_videos_csv_path):
         self._df = pd.read_csv(all_videos_csv_path, index_col=0)
 
-    @staticmethod
-    def try_import_openpose(path_to_openpose):
-        pass
-
     def process_all(self):
         pass
 
-    def find_each_signaler_frame_talks_alone(self, folder):
+    def find_where_signalers_talks_alone(self, folder):
+        """
+        Encontra onde existe pessoas sinalizando sinais sozinha dentro da legenda.
+
+        Parameters
+        ----------
+        folder : str
+            Nome do folder para encontrar a legenda. Note que as legendas aqui
+            ja foram previamente extraidas e devem ter sido corretamente
+            carregadas pelo self._df que é um Pandas Dataframe.
+
+        Returns
+        -------
+        persons_alone -> dict
+            Dicionario contendo todas as pessoas presentes nas
+            legendas. Com as informações indicando o inicio e fim de onde as
+            pessoas falam sem serem interrompidas. Com cada entrada do
+            dicionario no seguinte formato {ID: {'beg': int, 'end': int}}
+            com ID sendo o ID da legenda, beg e end respectivamente o inicio e
+            o fim em frames onde a respectiva pessoa fala sem interrupções.
+        """
+
         persons = self._df[self._df['folder_name'] == folder]['talker_id']\
             .unique()
 
