@@ -67,12 +67,23 @@ class DataframePerson2Sign:
         return np.argmax(np.array(person_all_joints_dist))
 
     def __make_derivate_around_a_frame(self, sample, beg, mid, end):
-        return 0
+        return None
 
     def process_single_sample_region(self, sample, beg, mid, end):
         pass
 
     def process_single_sample(self, sample):
+        """
+        Processa um unico exemplo de um video de poses.
+
+        Parameters
+        ----------
+        sample: pd.DataFrame
+
+        Returns
+        -------
+
+        """
         res = self.method.split(' ')
 
         beg_frame_video = int(sample.frame.iloc[0])
@@ -87,6 +98,7 @@ class DataframePerson2Sign:
         window_size = window_beg + window_end
         window_size = int(window_size)
 
+        who_talking = {}
         for it in range(beg_frame_video, end_frame_video - window_size + 1):
             mid_curr_window = it + window_beg \
                 if it + window_beg <= end_frame_video else end_frame_video
@@ -103,6 +115,11 @@ class DataframePerson2Sign:
                                                            beg_curr_window,
                                                            mid_curr_window,
                                                            end_curr_window)
+                who_talking.update({method_name: talker_id,
+                                    'frames': [beg_curr_window, mid_curr_window,
+                                               end_curr_window]})
+
+        return who_talking
 
     def process_all(self):
         pass
