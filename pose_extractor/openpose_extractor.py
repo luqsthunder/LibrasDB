@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import sys
 import os
+import matplotlib.pyplot as plt
 from sys import platform
 
 
@@ -11,9 +12,11 @@ def from_datum_to_datumlike(datum):
 
 class DatumLike:
     def __init__(self):
-        self.bodyKeypoints = np.array([])
+        self.poseKeypoints = np.array([])
         self.handKeypoints = [np.array([])]
         self.headKeypoints = np.array([])
+        self.cvOutputData = np.array([])
+        self.cvInputData = np.array([])
 
 
 class OpenposeExtractor:
@@ -27,8 +30,8 @@ class OpenposeExtractor:
             model_folder = os.path.join(openpose_path, 'models')
             params["model_folder"] = model_folder
             params["hand"] = True
-            params["hand_detector"] = 2
-            params["body"] = 0
+            params["hand_detector"] = 0
+            # params["body"] = True
             self.op_wrapper = op.WrapperPython()
             self.op_wrapper.configure(params)
             self.op_wrapper.start()

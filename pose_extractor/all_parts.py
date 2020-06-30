@@ -10,6 +10,7 @@ HAND_PARTS = { "Wrist":                 0, "ThumbMetacarpal":         1,
                "LittleFingerProximal": 18, "LittleFingerMiddle":     19,
                "LittleFingerDistal":   20
              }
+HAND_PARTS_NAMES = [k for k, v in HAND_PARTS.items()]
 
 INV_HAND_PARTS = {v: k for k, v in HAND_PARTS.items()}
 
@@ -39,6 +40,7 @@ BODY_PARTS = { "Nose":    0, "Neck":       1, "RShoulder":    2, "RElbow":  3,
                "RHip":    8, "RKnee":      9, "RAnkle":      10, "LHip":   11,
                "LKnee":  12, "LAnkle":    13, "REye":        14, "LEye":   15,
                "REar":   16, "LEar":      17, "Background":  18 }
+BODY_PARTS_NAMES = [k for k, v in BODY_PARTS.items()]
 
 INV_BODY_PARTS = {v: k for k, v in BODY_PARTS.items()}
 

@@ -35,6 +35,9 @@ class FindSignalingCentroid:
         persons = self._df[self._df['folder_name'] == folder]['talker_id']\
             .unique()
 
+        if persons.shape[0] == 0:
+            raise RuntimeError(f'No person found in folder name {folder}')
+
         end_video_frame_value = 0
         beg_video_frame_value = 999999
         for p in persons:

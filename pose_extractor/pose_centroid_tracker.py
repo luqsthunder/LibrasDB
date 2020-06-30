@@ -2,10 +2,12 @@ import numpy as np
 import pandas as pd
 import cv2 as cv
 from copy import copy
-from pose_extractor.all_parts import BODY_PARTS, HAND_PARTS
+from pose_extractor.all_parts import BODY_PARTS_NAMES, HAND_PARTS_NAMES
 from pose_extractor.openpose_extractor import DatumLike, OpenposeExtractor
 from pose_extractor.find_signaling_centroid import FindSignalingCentroid
 from pose_extractor.df_utils import update_xy_pose_df
+from libras_classifiers.generate_dataframe_person_2_sign import \
+    DataframePerson2Sign
 
 
 class PoseCentroidTracker:
@@ -33,8 +35,8 @@ class PoseCentroidTracker:
 
         """
         self.persons_id = persons_id if persons_id is not None else []
-        self.body_parts = BODY_PARTS if body_parts is not None else body_parts
-        self.hands_parts = HAND_PARTS if hand_parts is not None else hand_parts
+        self.body_parts = BODY_PARTS_NAMES if body_parts is None else body_parts
+        self.hands_parts = HAND_PARTS_NAMES if hand_parts is None else hand_parts
         self.head_parts = head_parts
         self.body_dist_threshold = body_dist_threshold
         self.hand_dist_threshold = hand_dist_threshold
@@ -68,8 +70,9 @@ class PoseCentroidTracker:
         self.last_hands_list = None
         self.curr_dt = None
         self.signaler_find = FindSignalingCentroid(all_video_csv_path)
-        openpose_path = '../../Libraries/repos/openpose/build'
+        openpose_path = '../openpose/'
         self.pose_extractor = OpenposeExtractor(openpose_path=openpose_path)
+        self.person_2_sign = DataframePerson2Sign(None)
 
     def register_persons_from_sign_df(self, folder_path):
         persons_alone = \
@@ -77,54 +80,96 @@ class PoseCentroidTracker:
         # TODO:
         # -  Extrair as poses rastreando cada uma na duração completa de cada
         #    tempo. [ok]
-        # -  Localmente testa 5 frames.
+        # -  Localmente testa 5 frames [ok].
         # -  Remove o teste de 5 frames.
         # -  Cria um ipython rodando tudo.
         # -  Dentro do ipython deve ter uma célula para instalar o openpose.
         # -  E roda completamente no colab.
         video = cv.VideoCapture(folder_path)
-        pose_df_cols = ['person', 'frame']
-        pose_df_cols.extend(self.body_parts)
-        pose_df_cols.extend(self.hands_parts)
-        pose_df = pd.DataFrame(columns=pose_df_cols)
-        for person_sub_id, alone_talk in persons_alone.items():
+        persons_body_centroid = None
+        x_mid_point = None
+        df_persons_centroid_video = pd.DataFrame(columns=['folder',
+                                                          'talker_id',
+                                                          'centroid'])
+
+        for person_sub_id, alone_talk in persons_alone.items()[0:]:
             video.set(cv.CAP_PROP_POS_FRAMES, alone_talk['beg'])
             end_pos = alone_talk['end']
+            persons_centroids = [[], []]
+            pose_df_cols = ['person', 'frame']
+            pose_df_cols.extend(self.body_parts)
+            pose_df_cols.extend(self.hands_parts)
+            pose_df = pd.DataFrame(columns=pose_df_cols)
+
             while video.get(cv.CAP_PROP_POS_FRAMES) <= end_pos:
                 ret, frame = video.read()
                 if not ret:
                     raise RuntimeError(f'Video Ended Beforme was expected.'
                                        f'The video is: {folder_path}')
+                # plt.imshow(frame)
+                # plt.show()
 
                 dt = self.pose_extractor.extract_poses(frame)
+
                 # TODO:
                 # [ok] - extrai o X do centroid de cada pessoa e pega o valor
                 #        do meio como elas estão sentadas vc tem como dividir a
                 #        cena em 2 e ter menos trabalho para rastreamento.
                 #
-                # [  ] - Separa as pessoas pelo ponto do meio analisando o
+                # [ok] - Separa as pessoas pelo ponto do meio analisando o
                 #        centroid. Todas as duas pessoas presentes na cena,
                 #        são ordenadas da esquerda para direita.
                 #        Logo se o centroid anterior ao meio deve ser a
                 #        posição 0 e o a direita a posição 1.
+                # [  ] - Checar se os anteriores estão certos.
 
-                persons_body_centroid = list(map(self.make_xy_centroid,
-                                                 dt.poseKeypoints))
+                if persons_body_centroid is None:
+                    persons_body_centroid = list(map(self.make_xy_centroid,
+                                                     dt.poseKeypoints))
 
-                persons_pos_id = []
-                x_mid_point = sum(map(lambda x: x[0], persons_body_centroid))
-                x_mid_point = x_mid_point / len(persons_body_centroid)
+                    x_mid_point = sum(map(lambda x: x[0],
+                                      persons_body_centroid))
+                    x_mid_point = x_mid_point / len(persons_body_centroid)
+
                 curr_frame = video.get(cv.CAP_PROP_POS_FRAMES)
+
+                curr_centroids = list(map(self.make_xy_centroid,
+                                          dt.poseKeypoints))
+
+                left_id = 0 if curr_centroids[0][0] < x_mid_point else 1
+                right_id = 1 if left_id == 0 else 0
+                persons_pos_id = [left_id, right_id]
+                persons_centroids[left_id].append(
+                    curr_centroids[left_id])
+                persons_centroids[right_id].append(
+                    curr_centroids[right_id])
 
                 # construindo o df com a posição relativa apenas a divisão da
                 # cena para falante da direita e falante da esquerda.
                 # para apos achar o que mais fala no tempo atual e atribuir
                 # a ele o ID correto que será o da legenda.
-                pose_df = update_xy_pose_df(dt, pose_df, curr_frame,
-                                            persons_pos_id[0],
-                                            self.body_parts,
-                                            self.hands_parts)
+                for person_id in persons_pos_id:
+                    pose_df = update_xy_pose_df(dt, pose_df, curr_frame,
+                                                person_id,
+                                                persons_pos_id[person_id],
+                                                self.body_parts,
+                                                None)
+            # TODO:
+            # [ok] - Achar quem tem mais enegergia/distancia gasta na DF e
+            #        atribuir o ID da pessoa na legenda ao centroid dessa
+            #        pessoa.
+            talking_person_id = \
+                self.person_2_sign.process_single_sample(pose_df)
+            print(talking_person_id)
+            talker_centroid = persons_body_centroid[talking_person_id]
+            curr_data = pd.DataFrame(data=dict(folder=[folder_path],
+                                               talker_id=[person_sub_id],
+                                               centroid=[talker_centroid]))
 
+            df_persons_centroid_video = \
+                df_persons_centroid_video.append(curr_data, ignore_index=True)
+
+        return df_persons_centroid_video
 
     def __make_persons_list(self, dt):
         """
@@ -211,13 +256,9 @@ class PoseCentroidTracker:
         self.curr_dt = copy(datum)
         self.clean_current_datum()
 
-        new_persons_list = self.__make_persons_list(datum)
-        self.last_persons_list = self.update_persons_list(new_persons_list) \
-            if self.last_persons_list is None else new_persons_list
-
-        new_hands_list = self.__make_persons_list(datum)
-        self.last_hands_list = self.update_hands_list(new_hands_list) \
-            if self.last_persons_list is None else new_hands_list
+        # TODO:
+        # [  ] - checar o meio atual, separar os IDs nos datums.
+        # [  ] - Atribuir o ID relacionado a cada lado.
 
 
     def get_from_id_persons(self, person_id):
