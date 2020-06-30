@@ -15,7 +15,10 @@ class TestPoseCentroidTracker:
         pass
 
     def test_registers_persons_from_sing_df(self):
-        folder_name = \
-            './db\\Alagoas\\Inventário de Libras Maceió\\' \
-            'Inventário Nacional de Libras - Surdos de Referência v1004\\v0.mp4'
+        folder_name = '../LibrasCorpusScrapy/db\\Santa Catarina\\' \
+                      'Inventario Libras' \
+                      '\\ Inventário Nacional de Libras - Grande ' \
+                      'Florianópolis (Parte II) v1074\\' \
+                      'FLN_G1_M1_entrevista_CAM1.mp4'
+
         self.tracker.register_persons_from_sign_df(folder_name)
