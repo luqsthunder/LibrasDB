@@ -2,8 +2,7 @@ import os
 import elementpath
 import xml.etree.ElementTree as et
 import pandas as pd
-from tqdm.notebook import tqdm
-from tqdm import tqdm_nootebook
+from tqdm import tqdm
 from copy import copy
 import cv2 as cv
 
@@ -25,7 +24,23 @@ class AllEAFParser2CSV:
         self.bad_videos = []
         self.bad_subs = []
 
-    def process(self):
+    def hiho(self):
+        print('hiho')
+        
+    def amount_items(self):
+        total_items = 0
+
+        for estates_path in self.estates_path_in_db:
+            for proj_path in os.listdir(estates_path):
+                proj_path = os.path.join(estates_path, proj_path)
+
+                proj_dirs = os.listdir(proj_path)
+
+                total_items += len(proj_dirs)
+
+        yield total_items
+
+    def process(self, pbar=None):
         """
         Funcao principal que processa todas as legendas.
 
@@ -34,14 +49,14 @@ class AllEAFParser2CSV:
 
         """
         gen_subs = self.__gen_xmls_base_subs()
-        amount_folders = next(gen_subs)
+        amount_folders = self.amount_items()
         df_cols = ['sign', 'beg', 'end', 'folder_name', 'talker_id', 'hand']
         libras_df = pd.DataFrame(columns=df_cols)
 
-        for subs_xml, videos in tqdm_notebook(gen_subs, total=amount_folders,
-                                              position=0,
-                                     desc='Processing EAFs'):
-            # TODO: destrinxar as legendas e comparar se elas são iguais
+        pbar = tqdm(total=amount_folders, desc='Processing EAFs') \
+            if pbar is None else pbar
+
+        for subs_xml, videos in gen_subs:
 
             if len(subs_xml) == 0 or len(videos) == 0:
                 continue
@@ -69,6 +84,8 @@ class AllEAFParser2CSV:
             # iterrows retorna uma tupla com (idx: int, row: pd.Series)
             libras_df = self.__update_sign_df(libras_df, subs[0], time_stamps[0],
                                               videos[0])
+            pbar.update(1)
+            pbar.refresh()
 
         # Nos arquivos EAF do Corpus de Libras cada falante quando executa um
         # sinal com ambas as mãos é colocado em duplicidade no EAF.
@@ -76,7 +93,9 @@ class AllEAFParser2CSV:
         # saber ja que vamos extrair o esqueleto posteriormente.
         row_2_drop = []
         libras_df.to_csv('dupl-all_videos.csv')
-        for it, row in tqdm_notebook(enumerate(libras_df.iterrows()), desc='dups'):
+        pbar.reset(total=libras_df.shape[0])
+        pbar.set_description('dups')
+        for it, row in enumerate(libras_df.iterrows()):
             row = row[1]
             res = libras_df.loc[(libras_df['beg'] == row['beg']) &
                                 (libras_df['end'] == row['end']) &
@@ -91,6 +110,8 @@ class AllEAFParser2CSV:
         single_list_drop = list(map(lambda x: x[1], row_2_drop))
         single_list_drop = list(set(single_list_drop))
         libras_df = libras_df.drop(single_list_drop)
+        pbar.update(1)
+        pbar.refresh()
 
         libras_df.to_csv('all_videos.csv')
 
@@ -252,18 +273,6 @@ class AllEAFParser2CSV:
         Generator com cada video e legenda dentro da base.
         """
 
-        total_items = 0
-
-        for estates_path in self.estates_path_in_db:
-            for proj_path in os.listdir(estates_path):
-                proj_path = os.path.join(estates_path, proj_path)
-
-                proj_dirs = os.listdir(proj_path)
-
-                total_items += len(proj_dirs)
-
-        yield total_items
-
         for estates_path in self.estates_path_in_db:
             for proj_path in os.listdir(estates_path):
                 proj_path = os.path.join(estates_path, proj_path)
@@ -294,6 +303,10 @@ class AllEAFParser2CSV:
                         continue
 
                     videos = list(filter(lambda x: '.mp4' in x, items_dir))
+                    if len(videos) == 0:
+                        yield [], []
+                        continue
+
                     failed_video = [False] * len(videos)
                     good_videos = []
                     for it, v in enumerate(videos):
@@ -301,16 +314,16 @@ class AllEAFParser2CSV:
                             vid = cv.VideoCapture(v)
                             ret, frame = vid.read()
                             if not vid.isOpened() or (not ret):
-                                failed_video[it] = True
+                                self.bad_videos.append((videos, item_path))
                                 vid.release()
                                 continue
                         except cv.error:
-                            failed_video[it] = True
+                            self.bad_videos.append((videos, item_path))
+                            continue
                         else:
                             good_videos.append(v)
                             vid.release()
-                    if failed_video[0] and failed_video[3]:
-                        self.bad_videos.append((videos, item_path))
+                    if failed_video[0]:
                         yield [], []
                         continue
 
