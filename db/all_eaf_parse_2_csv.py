@@ -39,6 +39,7 @@ class AllEAFParser2CSV:
         libras_df = pd.DataFrame(columns=df_cols)
 
         for subs_xml, videos in tqdm_notebook(gen_subs, total=amount_folders,
+                                              position=0,
                                      desc='Processing EAFs'):
             # TODO: destrinxar as legendas e comparar se elas são iguais
 
