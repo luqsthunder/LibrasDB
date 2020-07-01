@@ -2,7 +2,7 @@ import os
 import elementpath
 import xml.etree.ElementTree as et
 import pandas as pd
-from tqdm import tqdm
+from tqdm.notebook import tqdm
 from copy import copy
 import cv2 as cv
 
@@ -290,7 +290,7 @@ class AllEAFParser2CSV:
                         continue
 
                     videos = list(filter(lambda x: '.mp4' in x, items_dir))
-                    failed_video = [False, False, False, False]
+                    failed_video = [False] * len(videos)
                     good_videos = []
                     for it, v in enumerate(videos):
                         try:
