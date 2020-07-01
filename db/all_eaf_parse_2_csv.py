@@ -58,7 +58,7 @@ class AllEAFParser2CSV:
                 if has_subs_diff:
                     for it in range(len(subs)):
                         dif_df = pd.DataFrame(columns=df_cols)
-                        name_df = f'{videos[it]}-diff_df-it-{it}.csv'
+                        name_df = f'{videos[0]}-diff_df-it-{it}.csv'
                         self.__update_sign_df(dif_df, subs[it],
                                               time_stamps[it],
                                               videos[0]).to_csv(name_df)
