@@ -26,7 +26,7 @@ class AllEAFParser2CSV:
 
     def hiho(self):
         print('hiho')
-        
+
     def amount_items(self):
         total_items = 0
 
@@ -38,7 +38,7 @@ class AllEAFParser2CSV:
 
                 total_items += len(proj_dirs)
 
-        yield total_items
+        return total_items
 
     def process(self, pbar=None):
         """
