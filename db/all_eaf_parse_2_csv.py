@@ -75,7 +75,7 @@ class AllEAFParser2CSV:
         # saber ja que vamos extrair o esqueleto posteriormente.
         row_2_drop = []
         libras_df.to_csv('dupl-all_videos.csv')
-        for it, row in tqdm(enumerate(libras_df.iterrows()), desc='dups'):
+        for it, row in tqdm_notebook(enumerate(libras_df.iterrows()), desc='dups'):
             row = row[1]
             res = libras_df.loc[(libras_df['beg'] == row['beg']) &
                                 (libras_df['end'] == row['end']) &
