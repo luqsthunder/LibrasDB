@@ -3,6 +3,7 @@ import elementpath
 import xml.etree.ElementTree as et
 import pandas as pd
 from tqdm.notebook import tqdm
+from tqdm import tqdm_nootebook
 from copy import copy
 import cv2 as cv
 
@@ -37,7 +38,7 @@ class AllEAFParser2CSV:
         df_cols = ['sign', 'beg', 'end', 'folder_name', 'talker_id', 'hand']
         libras_df = pd.DataFrame(columns=df_cols)
 
-        for subs_xml, videos in tqdm(gen_subs, total=amount_folders,
+        for subs_xml, videos in tqdm_notebook(gen_subs, total=amount_folders,
                                      desc='Processing EAFs'):
             # TODO: destrinxar as legendas e comparar se elas são iguais
 
@@ -72,23 +73,25 @@ class AllEAFParser2CSV:
         # sinal com ambas as mãos é colocado em duplicidade no EAF.
         # Nessa etapa abaixo removemos as duplicidades pois não é interessante
         # saber ja que vamos extrair o esqueleto posteriormente.
-        # row_2_drop = []
-        # for it, row in tqdm(enumerate(libras_df.iterrows()), desc='dups'):
-        #     row = row[1]
-        #     res = libras_df.loc[(libras_df['beg'] == row['beg']) &
-        #                         (libras_df['end'] == row['end']) &
-        #                         (libras_df['talker_id'] == row['talker_id']) &
-        #                         (libras_df['folder_name'] == row['folder_name']) &
-        #                         (libras_df['sign'] == row['sign'])]
-        #     if res.shape[0] > 1:
-        #         libras_df.loc[it, 'hand'] = 2
-        #         row_2_drop.append(res.index)
-        #     else:
-        #         libras_df.loc[it, 'hand'] = 1
-        # single_list_drop = list(map(lambda x: x[1], row_2_drop))
-        # single_list_drop = list(set(single_list_drop))
-        # libras_df = libras_df.drop(single_list_drop)
+        row_2_drop = []
         libras_df.to_csv('dupl-all_videos.csv')
+        for it, row in tqdm(enumerate(libras_df.iterrows()), desc='dups'):
+            row = row[1]
+            res = libras_df.loc[(libras_df['beg'] == row['beg']) &
+                                (libras_df['end'] == row['end']) &
+                                (libras_df['talker_id'] == row['talker_id']) &
+                                (libras_df['folder_name'] == row['folder_name']) &
+                                (libras_df['sign'] == row['sign'])]
+            if res.shape[0] > 1:
+                libras_df.loc[it, 'hand'] = 2
+                row_2_drop.append(res.index)
+            else:
+                libras_df.loc[it, 'hand'] = 1
+        single_list_drop = list(map(lambda x: x[1], row_2_drop))
+        single_list_drop = list(set(single_list_drop))
+        libras_df = libras_df.drop(single_list_drop)
+
+        libras_df.to_csv('all_videos.csv')
 
     @staticmethod
     def __update_sign_df(df: pd.DataFrame, subs: pd.DataFrame,
