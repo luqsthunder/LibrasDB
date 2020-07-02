@@ -25,7 +25,9 @@ class AllEAFParser2CSV:
                                               self.estates_path_in_db))
         self.bad_videos = []
         self.bad_subs = []
-        self.thread_executor = ThreadPoolExecutor(max_workers=multiprocessing.cpu_count())
+        self.amount_workers = multiprocessing.cpu_count() * 4
+        self.thread_executor = \
+            ThreadPoolExecutor(max_workers=self.amount_workers)
 
     def amount_items(self):
         """
@@ -62,9 +64,10 @@ class AllEAFParser2CSV:
 
         """
 
-        if len(data_list) > 4:
-            raise RuntimeError('data_list must be less than 4, else '
-                               'partitioning your data_list')
+        if len(data_list) >= self.amount_workers:
+            raise RuntimeError('data_list must be less or equals than'
+                               '{self.amount_workers}, else '
+                               'split your data_list')
         futures = [
             self.thread_executor.submit(fn, x) for x in data_list
         ]
@@ -76,7 +79,10 @@ class AllEAFParser2CSV:
         return res
 
 
-    def __process_dupls_async(self, libras_df, beg_rng, end_rng):
+    def __process_async_dupls(self, libras_df, beg_rng, end_rng):
+        pass
+
+    def __process_dupls_batch(self, libras_df, beg_rng, end_rng):
         """
 
         Parameters
@@ -106,7 +112,7 @@ class AllEAFParser2CSV:
 
         return row_2_drop, hands_in_rows
 
-    def process(self, pbar=None, pbar_dup=None):
+    def process(self, pbar=None, pbar_dup=None, path_to_save_sign_df='./'):
         """
         Funcao principal que processa todas as legendas.
 
@@ -153,11 +159,15 @@ class AllEAFParser2CSV:
                 if has_subs_diff:
                     for it in range(len(subs)):
                         dif_df = pd.DataFrame(columns=df_cols)
-                        name_df = f'v({amount_dups})diff_df-it-{it}.csv'
+                        only_video_name = video[0].split('\\')[-1]
+                        name_df = f'v-{only_video_name}-({amount_dups})'
+                                   'diff_df-it-{it}.csv'
+                        name_df = os.path.join(path_to_save_sign_df, name_df)
                         self.__update_sign_df(dif_df, subs[it],
                                               time_stamps[it],
                                               videos[0]).to_csv(name_df)
                         amount_dups += 1
+
                     pbar.update(1)
                     pbar.refresh()
                     continue
@@ -174,7 +184,9 @@ class AllEAFParser2CSV:
         # # Nessa etapa abaixo removemos as duplicidades pois não é interessante
         # # saber ja que vamos extrair o esqueleto posteriormente.
         row_2_drop = []
-        libras_df.to_csv('dupl-all_videos.csv')
+        path_2_dup_all_videos = os.path.join(path_to_save_sign_df,
+                                             'dupl-all_videos.csv')
+        libras_df.to_csv(path_to_save_sign_df)
         pbar_dup = tqdm(total=libras_df.shape[0], desc='dups') \
             if pbar_dup is None else pbar_dup
 
@@ -198,7 +210,8 @@ class AllEAFParser2CSV:
         pbar_dup.update(1)
         pbar_dup.refresh()
 
-        libras_df.to_csv('all_videos.csv')
+        path_2_all_videos = os.path.join(path_to_save_sign_df, 'all_videos.csv')
+        libras_df.to_csv(path_2_all_videos)
 
     @staticmethod
     def __update_sign_df(df: pd.DataFrame, subs: pd.DataFrame,
