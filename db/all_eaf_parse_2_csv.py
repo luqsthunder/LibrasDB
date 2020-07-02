@@ -5,6 +5,8 @@ import pandas as pd
 from tqdm import tqdm
 from copy import copy
 import cv2 as cv
+from concurrent.futures import ThreadPoolExecutor
+import multiprocessing
 
 
 class AllEAFParser2CSV:
@@ -23,9 +25,7 @@ class AllEAFParser2CSV:
                                               self.estates_path_in_db))
         self.bad_videos = []
         self.bad_subs = []
-
-    def hiho(self):
-        print('hiho')
+        self.thread_executor = ThreadPoolExecutor(max_workers=multiprocessing.cpu_count())
 
     def amount_items(self):
         total_items = 0
@@ -39,6 +39,38 @@ class AllEAFParser2CSV:
                 total_items += len(proj_dirs)
 
         return total_items
+
+    def __process_eaf_async(self, fn, data_list):
+        if len(data_list) > 4:
+            raise RuntimeError('data_list must be less than 4, else '
+                               'partitioning your data_list')
+        futures = [
+            self.thread_executor.submit(fn, x) for x in data_list
+        ]
+        all_done = [False] * len(futures)
+        while not all(all_done):
+            all_done = [f.done() for f in futures]
+
+        res = [f.result() for f in futures]
+        return res
+    def __process_dupls_async(self, libras_df, beg_rng, end_rng):
+        row_2_drop = []
+        hands_in_rows = []
+        for it, row in enumerate(libras_df.iterrows()[beg_rng:end_rng]):
+            row = row[1]
+            res = libras_df.loc[(libras_df['beg'] == row['beg']) &
+                                (libras_df['end'] == row['end']) &
+                                (libras_df['talker_id'] == row['talker_id']) &
+                                (libras_df['folder_name'] == row['folder_name']) &
+                                (libras_df['sign'] == row['sign'])]
+            if res.shape[0] > 1:
+                # libras_df.loc[it, 'hand'] = 2
+                row_2_drop.append(res.index)
+                hands_in_rows.append(dict(row=res.index, hands=2))
+            else:
+                hands_in_rows.append(dict(row=res.index, hands=1))
+
+        return row_2_drop, hands_in_rows
 
     def process(self, pbar=None, pbar_dup=None):
         """
@@ -62,8 +94,12 @@ class AllEAFParser2CSV:
             if len(subs_xml) == 0 or len(videos) == 0:
                 continue
 
-            time_stamps = [self.__get_parsed_timestamps(x) for x in subs_xml]
-            subs = [self.__get_subs(x) for x in subs_xml]
+            time_stamps = self.__process_eaf_async(self.__get_parsed_timestamps,
+                                                   subs_xml)
+            # time_stamps = [self.__get_parsed_timestamps(x) for x in subs_xml]
+
+            subs = self.__process_eaf_async(self.__get_subs, subs_xml)
+            # subs = [self.__get_subs(x) for x in subs_xml]
 
             if len(subs) > 0:
                 has_subs_diff = False
@@ -90,11 +126,12 @@ class AllEAFParser2CSV:
                                               videos[0])
             pbar.update(1)
             pbar.refresh()
+            continue
 
-        # Nos arquivos EAF do Corpus de Libras cada falante quando executa um
-        # sinal com ambas as mãos é colocado em duplicidade no EAF.
-        # Nessa etapa abaixo removemos as duplicidades pois não é interessante
-        # saber ja que vamos extrair o esqueleto posteriormente.
+        # # Nos arquivos EAF do Corpus de Libras cada falante quando executa um
+        # # sinal com ambas as mãos é colocado em duplicidade no EAF.
+        # # Nessa etapa abaixo removemos as duplicidades pois não é interessante
+        # # saber ja que vamos extrair o esqueleto posteriormente.
         row_2_drop = []
         libras_df.to_csv('dupl-all_videos.csv')
         pbar_dup = tqdm(total=libras_df.shape[0], desc='dups') \
@@ -323,9 +360,11 @@ class AllEAFParser2CSV:
                             if not vid.isOpened() or (not ret):
                                 self.bad_videos.append((videos, item_path))
                                 vid.release()
+                                print(f'found a bad video {v}')
                                 continue
                         except cv.error:
                             self.bad_videos.append((videos, item_path))
+                            vid.release()
                             continue
                         else:
                             good_videos.append(v)
