@@ -40,7 +40,7 @@ class AllEAFParser2CSV:
 
         return total_items
 
-    def process(self, pbar=None):
+    def process(self, pbar=None, pbar_dup=None):
         """
         Funcao principal que processa todas as legendas.
 
@@ -56,6 +56,8 @@ class AllEAFParser2CSV:
         pbar = tqdm(total=amount_folders, desc='Processing EAFs') \
             if pbar is None else pbar
 
+
+        amount_dups = 0
         for subs_xml, videos in gen_subs:
 
             if len(subs_xml) == 0 or len(videos) == 0:
@@ -75,10 +77,11 @@ class AllEAFParser2CSV:
                 if has_subs_diff:
                     for it in range(len(subs)):
                         dif_df = pd.DataFrame(columns=df_cols)
-                        name_df = f'{videos[0]}-diff_df-it-{it}.csv'
+                        name_df = f'v({amount_dups})diff_df-it-{it}.csv'
                         self.__update_sign_df(dif_df, subs[it],
                                               time_stamps[it],
                                               videos[0]).to_csv(name_df)
+                        amount_dups += 1
                     continue
 
             # iterrows retorna uma tupla com (idx: int, row: pd.Series)
@@ -93,8 +96,11 @@ class AllEAFParser2CSV:
         # saber ja que vamos extrair o esqueleto posteriormente.
         row_2_drop = []
         libras_df.to_csv('dupl-all_videos.csv')
-        pbar.reset(total=libras_df.shape[0])
-        pbar.set_description('dups')
+        pbar_dup = tqdm(total=libras_df.shape[0], desc='dups') \
+            if pbar_dup is None else pbar_dup
+
+        pbar_dup.reset(total=libras_df.shape[0])
+        pbar_dup.set_description('dups')
         for it, row in enumerate(libras_df.iterrows()):
             row = row[1]
             res = libras_df.loc[(libras_df['beg'] == row['beg']) &
@@ -110,8 +116,8 @@ class AllEAFParser2CSV:
         single_list_drop = list(map(lambda x: x[1], row_2_drop))
         single_list_drop = list(set(single_list_drop))
         libras_df = libras_df.drop(single_list_drop)
-        pbar.update(1)
-        pbar.refresh()
+        pbar_dup.update(1)
+        pbar_dup.refresh()
 
         libras_df.to_csv('all_videos.csv')
 
