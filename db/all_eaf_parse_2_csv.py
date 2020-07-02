@@ -15,8 +15,8 @@ class AllEAFParser2CSV:
         Parameters
         ----------
         base_db_path : String
-        Diretorio onde esta os outros diretorios crawladados que contem os
-        videos e legendas respectivos de cada um.
+            Diretorio onde esta os outros diretorios crawladados que contem os
+            videos e legendas respectivos de cada um.
         """
         # nome de todas as pastas presentes na base de dados.
         self.estates_path_in_db = [os.path.join(base_db_path, x)
@@ -28,6 +28,15 @@ class AllEAFParser2CSV:
         self.thread_executor = ThreadPoolExecutor(max_workers=multiprocessing.cpu_count())
 
     def amount_items(self):
+        """
+        Quantiade total de itens a serem processados.
+
+
+        Returns
+        -------
+        total_items: int
+            Total de itens a serem processados.
+        """
         total_items = 0
 
         for estates_path in self.estates_path_in_db:
@@ -41,6 +50,18 @@ class AllEAFParser2CSV:
         return total_items
 
     def __process_eaf_async(self, fn, data_list):
+        """
+
+        Parameters
+        ----------
+
+
+        Returns
+        -------
+
+
+        """
+
         if len(data_list) > 4:
             raise RuntimeError('data_list must be less than 4, else '
                                'partitioning your data_list')
@@ -53,7 +74,20 @@ class AllEAFParser2CSV:
 
         res = [f.result() for f in futures]
         return res
+
+
     def __process_dupls_async(self, libras_df, beg_rng, end_rng):
+        """
+
+        Parameters
+        ----------
+
+
+        Returns
+        -------
+
+        """
+
         row_2_drop = []
         hands_in_rows = []
         for it, row in enumerate(libras_df.iterrows()[beg_rng:end_rng]):
@@ -78,6 +112,13 @@ class AllEAFParser2CSV:
 
         Parameters
         ----------
+        pbar: tqdm or None
+            Barra de progresso para o processamento dos EAFs. Caso None o
+            a função cria uma própria pbar.
+
+        pbar_dup:
+            Barra de progresso para o processamento dos sinais em duplicatas.
+            Caso None o a função cria uma própria pbar.
 
         """
         gen_subs = self.__gen_xmls_base_subs()
