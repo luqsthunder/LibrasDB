@@ -56,7 +56,6 @@ class AllEAFParser2CSV:
         pbar = tqdm(total=amount_folders, desc='Processing EAFs') \
             if pbar is None else pbar
 
-
         amount_dups = 0
         for subs_xml, videos in gen_subs:
 
@@ -82,6 +81,8 @@ class AllEAFParser2CSV:
                                               time_stamps[it],
                                               videos[0]).to_csv(name_df)
                         amount_dups += 1
+                    pbar.update(1)
+                    pbar.refresh()
                     continue
 
             # iterrows retorna uma tupla com (idx: int, row: pd.Series)
