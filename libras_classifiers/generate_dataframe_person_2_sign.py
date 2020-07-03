@@ -64,7 +64,7 @@ class DataframePerson2Sign:
                 dist = np.sum(dist)
                 person_all_joints_dist[p_id] += dist
 
-        print(person_all_joints_dist)
+        print('all_persons_joint', person_all_joints_dist)
         return np.argmax(np.array(person_all_joints_dist))
 
     def __make_derivate_around_a_frame(self, sample, beg, mid, end):

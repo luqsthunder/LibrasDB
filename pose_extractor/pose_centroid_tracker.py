@@ -100,7 +100,7 @@ class PoseCentroidTracker:
             end_pos = alone_talk['end']
             fps = video.get(cv.CAP_PROP_FPS)
             print(fps)
-            end_pos = (alone_talk['beg'] + fps * 1) if end_pos > alone_talk['beg'] + fps * 1 else end_pos
+            end_pos = int(alone_talk['beg'] + fps * 5) + 1 if end_pos > int(alone_talk['beg'] + fps * 5) + 1 else end_pos
 
             print(end_pos, alone_talk['end'])
             persons_centroids = [[], []]
@@ -110,7 +110,7 @@ class PoseCentroidTracker:
             pose_df = pd.DataFrame(columns=pose_df_cols)
 
             if pbar is not None:
-                pbar.reset(total=end_pos - alone_talk['beg'])
+                pbar.reset(total=int(end_pos - alone_talk['beg']))
                 video_name = folder_path.split('/')[2]
                 pbar.set_description(f'p:{person_sub_id}')
             while video.get(cv.CAP_PROP_POS_FRAMES) <= end_pos:
@@ -143,8 +143,6 @@ class PoseCentroidTracker:
                     x_mid_point = x_mid_point / len(persons_body_centroid)
 
                 curr_frame = int(video.get(cv.CAP_PROP_POS_FRAMES))
-                print(curr_frame)
-
 
                 curr_centroids = list(map(self.make_xy_centroid,
                                           dt.poseKeypoints))
@@ -174,7 +172,7 @@ class PoseCentroidTracker:
             # [ok] - Achar quem tem mais enegergia/distancia gasta na DF e
             #        atribuir o ID da pessoa na legenda ao centroid dessa
             #        pessoa.
-            print(pose_df)
+
             talking_person_id = \
                 self.person_2_sign.process_single_sample(pose_df)
             print(talking_person_id)
@@ -183,7 +181,15 @@ class PoseCentroidTracker:
             curr_data = pd.DataFrame(data=dict(folder=[folder_path],
                                                talker_id=[person_sub_id],
                                                centroid=[talker_centroid]))
+            df_persons_centroid_video = \
+                df_persons_centroid_video.append(curr_data, ignore_index=True)
 
+            not_talking_person_id = 0 if talking_person_id == 1 else 1
+            not_talker_centroid = persons_body_centroid[not_talking_person_id]
+            not_talker_sub_id = 1 if person_sub_id == 2 else 2
+            curr_data = pd.DataFrame(data=dict(folder=[folder_path],
+                                               talker_id=[not_talker_sub_id],
+                                               centroid=[not_talker_centroid]))
             df_persons_centroid_video = \
                 df_persons_centroid_video.append(curr_data, ignore_index=True)
             break
