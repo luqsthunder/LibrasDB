@@ -72,7 +72,7 @@ class OpenposeExtractor:
             else:
                 # Change these variables to point to the correct folder
                 # (Release/x64 etc.)
-                sys.path.append('python')
+                sys.path.append(os.path.join(openpose_build_path, 'python'))
                 # If you run `make install`
                 # (default path is `/usr/local/python` for Ubuntu), you can
                 # also access the OpenPose/python module from there. This will

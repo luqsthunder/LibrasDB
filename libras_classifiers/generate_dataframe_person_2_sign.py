@@ -64,6 +64,7 @@ class DataframePerson2Sign:
                 dist = np.sum(dist)
                 person_all_joints_dist[p_id] += dist
 
+        print(person_all_joints_dist)
         return np.argmax(np.array(person_all_joints_dist))
 
     def __make_derivate_around_a_frame(self, sample, beg, mid, end):
@@ -115,9 +116,10 @@ class DataframePerson2Sign:
                                                            beg_curr_window,
                                                            mid_curr_window,
                                                            end_curr_window)
-                who_talking.update({method_name: talker_id,
-                                    'frames': [beg_curr_window, mid_curr_window,
-                                               end_curr_window]})
+                who_talking.update({method_name: {'id' :talker_id,
+                                                  'frames': [beg_curr_window, 
+                                                             mid_curr_window, 
+                                                             end_curr_window]}})
 
         return who_talking
 

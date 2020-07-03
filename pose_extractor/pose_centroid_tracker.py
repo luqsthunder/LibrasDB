@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import cv2 as cv
+import os
 from copy import copy
 from pose_extractor.all_parts import BODY_PARTS_NAMES, HAND_PARTS_NAMES
 from pose_extractor.openpose_extractor import DatumLike, OpenposeExtractor
@@ -74,9 +75,10 @@ class PoseCentroidTracker:
         self.pose_extractor = OpenposeExtractor(openpose_path=openpose_path)
         self.person_2_sign = DataframePerson2Sign(None)
 
-    def register_persons_from_sign_df(self, folder_path):
+    def register_persons_from_sign_df(self, folder_path, db_path, pbar=None):
         persons_alone = \
             self.signaler_find.find_where_signalers_talks_alone(folder_path)
+        print(persons_alone)
         # TODO:
         # -  Extrair as poses rastreando cada uma na duração completa de cada
         #    tempo. [ok]
@@ -85,22 +87,32 @@ class PoseCentroidTracker:
         # -  Cria um ipython rodando tudo.
         # -  Dentro do ipython deve ter uma célula para instalar o openpose.
         # -  E roda completamente no colab.
-        video = cv.VideoCapture(folder_path)
+        video = cv.VideoCapture(os.path.join(db_path, folder_path))
         persons_body_centroid = None
         x_mid_point = None
         df_persons_centroid_video = pd.DataFrame(columns=['folder',
                                                           'talker_id',
                                                           'centroid'])
 
-        for person_sub_id, alone_talk in persons_alone.items()[0:]:
+        for person_sub_id, alone_talk in persons_alone.items():
+            print(alone_talk)
             video.set(cv.CAP_PROP_POS_FRAMES, alone_talk['beg'])
             end_pos = alone_talk['end']
+            fps = video.get(cv.CAP_PROP_FPS)
+            print(fps)
+            end_pos = (alone_talk['beg'] + fps * 1) if end_pos > alone_talk['beg'] + fps * 1 else end_pos
+
+            print(end_pos, alone_talk['end'])
             persons_centroids = [[], []]
             pose_df_cols = ['person', 'frame']
             pose_df_cols.extend(self.body_parts)
             pose_df_cols.extend(self.hands_parts)
             pose_df = pd.DataFrame(columns=pose_df_cols)
 
+            if pbar is not None:
+                pbar.reset(total=end_pos - alone_talk['beg'])
+                video_name = folder_path.split('/')[2]
+                pbar.set_description(f'p:{person_sub_id}')
             while video.get(cv.CAP_PROP_POS_FRAMES) <= end_pos:
                 ret, frame = video.read()
                 if not ret:
@@ -126,12 +138,13 @@ class PoseCentroidTracker:
                 if persons_body_centroid is None:
                     persons_body_centroid = list(map(self.make_xy_centroid,
                                                      dt.poseKeypoints))
-
                     x_mid_point = sum(map(lambda x: x[0],
                                       persons_body_centroid))
                     x_mid_point = x_mid_point / len(persons_body_centroid)
 
-                curr_frame = video.get(cv.CAP_PROP_POS_FRAMES)
+                curr_frame = int(video.get(cv.CAP_PROP_POS_FRAMES))
+                print(curr_frame)
+
 
                 curr_centroids = list(map(self.make_xy_centroid,
                                           dt.poseKeypoints))
@@ -154,13 +167,18 @@ class PoseCentroidTracker:
                                                 persons_pos_id[person_id],
                                                 self.body_parts,
                                                 None)
+                if pbar is not None:
+                    pbar.update(1)
+                    pbar.refresh()
             # TODO:
             # [ok] - Achar quem tem mais enegergia/distancia gasta na DF e
             #        atribuir o ID da pessoa na legenda ao centroid dessa
             #        pessoa.
+            print(pose_df)
             talking_person_id = \
                 self.person_2_sign.process_single_sample(pose_df)
             print(talking_person_id)
+            talking_person_id = talking_person_id['dist']['id']
             talker_centroid = persons_body_centroid[talking_person_id]
             curr_data = pd.DataFrame(data=dict(folder=[folder_path],
                                                talker_id=[person_sub_id],
@@ -168,6 +186,7 @@ class PoseCentroidTracker:
 
             df_persons_centroid_video = \
                 df_persons_centroid_video.append(curr_data, ignore_index=True)
+            break
 
         return df_persons_centroid_video
 
