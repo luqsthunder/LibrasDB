@@ -139,6 +139,8 @@ class AllEAFParser2CSV:
         for subs_xml, videos in gen_subs:
 
             if len(subs_xml) == 0 or len(videos) == 0:
+                pbar.update(1)
+                pbar.refresh()
                 continue
 
             time_stamps = self.__process_eaf_async(self.__get_parsed_timestamps,
@@ -160,7 +162,7 @@ class AllEAFParser2CSV:
                     for it in range(len(subs)):
                         dif_df = pd.DataFrame(columns=df_cols)
                         only_video_name = video[0].split('\\')[-1]
-                        name_df = f'v-{only_video_name}-({amount_dups})'
+                        name_df = f'v-{only_video_name}-({amount_dups})' \
                                    'diff_df-it-{it}.csv'
                         name_df = os.path.join(path_to_save_sign_df, name_df)
                         self.__update_sign_df(dif_df, subs[it],
@@ -177,7 +179,6 @@ class AllEAFParser2CSV:
                                               videos[0])
             pbar.update(1)
             pbar.refresh()
-            continue
 
         # # Nos arquivos EAF do Corpus de Libras cada falante quando executa um
         # # sinal com ambas as mãos é colocado em duplicidade no EAF.
@@ -186,7 +187,7 @@ class AllEAFParser2CSV:
         row_2_drop = []
         path_2_dup_all_videos = os.path.join(path_to_save_sign_df,
                                              'dupl-all_videos.csv')
-        libras_df.to_csv(path_to_save_sign_df)
+        libras_df = pd.read_csv(path_to_save_sign_df)
         pbar_dup = tqdm(total=libras_df.shape[0], desc='dups') \
             if pbar_dup is None else pbar_dup
 
@@ -204,11 +205,13 @@ class AllEAFParser2CSV:
                 row_2_drop.append(res.index)
             else:
                 libras_df.loc[it, 'hand'] = 1
+            pbar_dup.update(1)
+            pbar_dup.refresh()
+
         single_list_drop = list(map(lambda x: x[1], row_2_drop))
         single_list_drop = list(set(single_list_drop))
         libras_df = libras_df.drop(single_list_drop)
-        pbar_dup.update(1)
-        pbar_dup.refresh()
+        
 
         path_2_all_videos = os.path.join(path_to_save_sign_df, 'all_videos.csv')
         libras_df.to_csv(path_2_all_videos)
