@@ -131,7 +131,7 @@ class PoseCentroidTracker:
             if pbar is not None:
                 pbar.reset(total=int(end_pos - alone_talk['beg']))
 
-            for _ in range(int(end_pos - alone_talk)):
+            for _ in range(int(end_pos - alone_talk['beg'])):
 
                 ret, frame = video.read()
                 if not ret:
