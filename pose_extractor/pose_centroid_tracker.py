@@ -3,6 +3,7 @@ import pandas as pd
 import cv2 as cv
 import os
 from copy import copy
+from shutil import copyfile
 from pose_extractor.all_parts import BODY_PARTS_NAMES, HAND_PARTS_NAMES
 from pose_extractor.openpose_extractor import DatumLike, OpenposeExtractor
 from pose_extractor.find_signaling_centroid import FindSignalingCentroid
@@ -109,7 +110,10 @@ class PoseCentroidTracker:
         persons_alone = \
             self.signaler_find.find_where_signalers_talks_alone(folder_path)
 
-        video = cv.VideoCapture(os.path.join(db_path, folder_path))
+        src_file_name = os.path.join(db_path, folder_path)
+        dst_file_name = './v0.mp4'
+        copyfile(src_file_name, dst_file_name)
+        video = cv.VideoCapture(dst_file_name)
         persons_body_centroid = None
         x_mid_point = None
         df_persons_centroid_video = pd.DataFrame(columns=['folder',
@@ -216,6 +220,7 @@ class PoseCentroidTracker:
                 df_persons_centroid_video.append(curr_data, ignore_index=True)
             break
 
+        os.remove(dst_file_name)
         return df_persons_centroid_video
 
     def __make_persons_list(self, dt):
