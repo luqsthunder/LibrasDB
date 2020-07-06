@@ -112,6 +112,8 @@ class DataframePerson2Sign:
                 if mid_curr_window + window_end <= end_frame_video \
                 else end_frame_video
 
+            print('process single sample', beg_curr_window, mid_curr_window,
+                  end_curr_window)
             for method_name in res:
                 talker_id = self.__method_map[method_name](sample,
                                                            beg_curr_window,
