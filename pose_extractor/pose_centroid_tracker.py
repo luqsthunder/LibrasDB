@@ -110,7 +110,15 @@ class PoseCentroidTracker:
         persons_alone = \
             self.signaler_find.find_where_signalers_talks_alone(folder_path)
 
-        src_file_name = os.path.join(db_path, folder_path)
+        # alguns folder_names estão com espaço no inicio de cada diretorios,
+        # para copia-los é necessário remover os espaços do inicio do nome
+        # dos diretorios.
+        correct_f_name = folder_path.split('/')
+        correct_f_name = list(map(lambda x: x if x[0] != ' ' else x[1:],
+                                  correct_f_name))
+        correct_f_name = os.path.join(*correct_f_name)
+        
+        src_file_name = os.path.join(db_path, correct_f_name)
         dst_file_name = './v0.mp4'
         copyfile(src_file_name, dst_file_name)
         video = cv.VideoCapture(dst_file_name)
