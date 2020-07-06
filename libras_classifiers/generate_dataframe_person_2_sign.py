@@ -55,9 +55,9 @@ class DataframePerson2Sign:
                 frame1 = person_joints[person_joints['frame'] == it]
                 frame0 = person_joints[person_joints['frame'] == (it - 1)]
 
-                frame1 = np.nan_to_num(frame1.values[0, 2:])
-                frame0 = np.nan_to_num(frame0.values[0, 2:])
-                dist = frame1 - frame0
+                frame1 = frame1.values[0, 2:]
+                frame0 = frame0.values[0, 2:]
+                dist = np.nan_to_num(frame1 - frame0)
                 dist = dist ** 2
                 dist = np.array([np.sum(joint_dist) for joint_dist in dist])
                 dist = np.sqrt(dist)
