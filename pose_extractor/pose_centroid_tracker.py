@@ -75,18 +75,40 @@ class PoseCentroidTracker:
         self.pose_extractor = OpenposeExtractor(openpose_path=openpose_path)
         self.person_2_sign = DataframePerson2Sign(None)
 
-    def register_persons_from_sign_df(self, folder_path, db_path, pbar=None):
+    def retrive_persons_centroid_from_sign_df(self, folder_path, db_path, pbar=None):
+        """
+        Encontra o centroid das pessoas presentes em um video e legenda presente no
+        dataframe da base de dados. Relacionando o centroid das pessoas ao id da
+        legenda. Para facilitar a extração das poses de quem fala um sinal. 
+
+        Parameters
+        ----------
+        folder_path: str
+            Nome do folder (atributo do dataframe).
+
+        db_path: str
+            Path de onde é encontrado a base de dados de videos.
+
+        pbar: tqdm.tqdm
+            Barra de progresso a ser utilizado enquanto é extraido os centroids das
+            pessoas presentes no video.
+
+        Raise
+        -----
+        RumtimeError:
+            Caso o video termine inexperadamente.
+
+        Returns
+        -------
+        pandas.DataFrame
+            Dataframe com as seguintes colunas: folder, talker_id, centroid, que
+            indicam respectivamente nome do folder (atributo do dataframe da base de
+            dados de sinais), id da pessoa relacionado a legenda e o centroid da
+            pessoa.
+        """
         persons_alone = \
             self.signaler_find.find_where_signalers_talks_alone(folder_path)
-        print(persons_alone)
-        # TODO:
-        # -  Extrair as poses rastreando cada uma na duração completa de cada
-        #    tempo. [ok]
-        # -  Localmente testa 5 frames [ok].
-        # -  Remove o teste de 5 frames.
-        # -  Cria um ipython rodando tudo.
-        # -  Dentro do ipython deve ter uma célula para instalar o openpose.
-        # -  E roda completamente no colab.
+
         video = cv.VideoCapture(os.path.join(db_path, folder_path))
         persons_body_centroid = None
         x_mid_point = None
@@ -95,14 +117,11 @@ class PoseCentroidTracker:
                                                           'centroid'])
 
         for person_sub_id, alone_talk in persons_alone.items():
-            print(alone_talk)
             video.set(cv.CAP_PROP_POS_FRAMES, alone_talk['beg'])
             end_pos = alone_talk['end']
             fps = video.get(cv.CAP_PROP_FPS)
-            print(fps)
             end_pos = int(alone_talk['beg'] + fps * 5) + 1 if end_pos > int(alone_talk['beg'] + fps * 5) + 1 else end_pos
 
-            print(end_pos, alone_talk['end'])
             persons_centroids = [[], []]
             pose_df_cols = ['person', 'frame']
             pose_df_cols.extend(self.body_parts)
@@ -111,9 +130,9 @@ class PoseCentroidTracker:
 
             if pbar is not None:
                 pbar.reset(total=int(end_pos - alone_talk['beg']))
-                video_name = folder_path.split('/')[2]
-                pbar.set_description(f'p:{person_sub_id}')
-            while video.get(cv.CAP_PROP_POS_FRAMES) <= end_pos:
+
+            for _ in range(int(end_pos - alone_talk)):
+
                 ret, frame = video.read()
                 if not ret:
                     raise RuntimeError(f'Video Ended Beforme was expected.'
@@ -133,6 +152,7 @@ class PoseCentroidTracker:
                 #        são ordenadas da esquerda para direita.
                 #        Logo se o centroid anterior ao meio deve ser a
                 #        posição 0 e o a direita a posição 1.
+                #
                 # [  ] - Checar se os anteriores estão certos.
 
                 if persons_body_centroid is None:
@@ -159,6 +179,7 @@ class PoseCentroidTracker:
                 # cena para falante da direita e falante da esquerda.
                 # para apos achar o que mais fala no tempo atual e atribuir
                 # a ele o ID correto que será o da legenda.
+
                 for person_id in persons_pos_id:
                     pose_df = update_xy_pose_df(dt, pose_df, curr_frame,
                                                 person_id,
@@ -175,9 +196,10 @@ class PoseCentroidTracker:
 
             talking_person_id = \
                 self.person_2_sign.process_single_sample(pose_df)
-            print(talking_person_id)
+
             talking_person_id = talking_person_id['dist']['id']
             talker_centroid = persons_body_centroid[talking_person_id]
+
             curr_data = pd.DataFrame(data=dict(folder=[folder_path],
                                                talker_id=[person_sub_id],
                                                centroid=[talker_centroid]))
