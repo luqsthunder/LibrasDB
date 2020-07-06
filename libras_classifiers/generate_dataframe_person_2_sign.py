@@ -62,6 +62,7 @@ class DataframePerson2Sign:
                 dist = np.array([np.sum(joint_dist) for joint_dist in dist])
                 dist = np.sqrt(dist)
                 dist = np.sum(dist)
+                print(dist)
                 person_all_joints_dist[p_id] += dist
 
         print('all_persons_joint', person_all_joints_dist)
