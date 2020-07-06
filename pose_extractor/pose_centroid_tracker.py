@@ -118,7 +118,7 @@ class PoseCentroidTracker:
                                   correct_f_name))
         correct_f_name = os.path.join(*correct_f_name)
 
-        src_file_name = os.path.join(db_path, folder_name)
+        src_file_name = os.path.join(db_path, folder_path)
         dst_file_name = './v0.mp4'
         copyfile(src_file_name, dst_file_name)
         video = cv.VideoCapture(dst_file_name)
