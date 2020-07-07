@@ -58,7 +58,7 @@ class DataframePerson2Sign:
                 frame1 = frame1.values[0, 2:]
                 frame0 = frame0.values[0, 2:]
                 dist = frame1 - frame0
-                dist = np.array([x for x in dist if not np.isnan(x)])
+                dist = np.array(list(filter(lambda x: x==x, dist)))
                 dist = dist ** 2
                 dist = np.sum(np.array([np.sum(x) for x in dist]))
                 print(f'sum after pow 2: \n {dist}\n')
