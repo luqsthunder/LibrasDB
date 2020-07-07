@@ -113,15 +113,11 @@ class PoseCentroidTracker:
         # alguns folder_names estão com espaço no inicio de cada diretorios,
         # para copia-los é necessário remover os espaços do inicio do nome
         # dos diretorios.
-        correct_f_name = folder_path.split('/')
-        correct_f_name = list(map(lambda x: x if x[0] != ' ' else x[1:],
-                                  correct_f_name))
-        correct_f_name = os.path.join(*correct_f_name)
-
         src_file_name = os.path.join(db_path, folder_path)
-        dst_file_name = './v0.mp4'
-        copyfile(src_file_name, dst_file_name)
-        video = cv.VideoCapture(dst_file_name)
+        #dst_file_name = './v0.mp4'
+        #copyfile(src_file_name, dst_file_name)
+        #video = cv.VideoCapture(dst_file_name)
+        video = cv.VideoCapture(src_file_name)
         persons_body_centroid = None
         x_mid_point = None
         df_persons_centroid_video = pd.DataFrame(columns=['folder',
@@ -167,24 +163,25 @@ class PoseCentroidTracker:
                 #
                 # [  ] - Checar se os anteriores estão certos.
 
-                if persons_body_centroid is None:
-                    persons_body_centroid = list(map(self.make_xy_centroid,
-                                                     dt.poseKeypoints))
-                    x_mid_point = sum(map(lambda x: x[0],
-                                      persons_body_centroid))
-                    x_mid_point = x_mid_point / len(persons_body_centroid)
+                #if persons_body_centroid is None:
+                #    persons_body_centroid = list(map(self.make_xy_centroid,
+                #                                     dt.poseKeypoints))
 
                 curr_frame = int(video.get(cv.CAP_PROP_POS_FRAMES))
 
                 curr_centroids = list(map(self.make_xy_centroid,
                                           dt.poseKeypoints))
 
+                x_mid_point = sum(map(lambda x: x[0],
+                                      curr_centroids))
+                x_mid_point = x_mid_point / len(curr_centroids)
+
                 left_id = 0 if curr_centroids[0][0] < x_mid_point else 1
                 right_id = 1 if left_id == 0 else 0
                 persons_pos_id = [left_id, right_id]
-                persons_centroids[left_id].append(
+                persons_centroids[0].append(
                     curr_centroids[left_id])
-                persons_centroids[right_id].append(
+                persons_centroids[1].append(
                     curr_centroids[right_id])
 
                 # construindo o df com a posição relativa apenas a divisão da
@@ -192,7 +189,7 @@ class PoseCentroidTracker:
                 # para apos achar o que mais fala no tempo atual e atribuir
                 # a ele o ID correto que será o da legenda.
 
-                for person_id in persons_pos_id:
+                for person_id in range(2):
                     pose_df = update_xy_pose_df(dt, pose_df, curr_frame,
                                                 person_id,
                                                 persons_pos_id[person_id],
@@ -206,6 +203,8 @@ class PoseCentroidTracker:
             #        atribuir o ID da pessoa na legenda ao centroid dessa
             #        pessoa.
 
+            print(persons_centroids)
+            persons_body_centroid = [persons_centroids[0][0], persons_centroids[1][0]]
             talking_person_id = \
                 self.person_2_sign.process_single_sample(pose_df)
 
@@ -228,7 +227,8 @@ class PoseCentroidTracker:
                 df_persons_centroid_video.append(curr_data, ignore_index=True)
             break
 
-        os.remove(dst_file_name)
+        #os.remove(dst_file_name)
+        video.release()
         return df_persons_centroid_video
 
     def __make_persons_list(self, dt):

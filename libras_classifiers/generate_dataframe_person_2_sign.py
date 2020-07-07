@@ -63,11 +63,11 @@ class DataframePerson2Sign:
                     lambda x: not isinstance(x, float), dist)))
                 dist = dist ** 2
                 dist = np.sum(np.array([np.sum(x) for x in dist]))
-                print(f'sum after pow 2: \n {dist}\n')
+                #print(f'sum after pow 2: \n {dist}\n')
                 dist = np.sqrt(dist)
-                print(f'sqrt: \n {dist}\n')
+                #print(f'sqrt: \n {dist}\n')
                 dist = np.sum(dist)
-                print(f'sum final: \n {dist}\n')
+                #print(f'sum final: \n {dist}\n')
                 person_all_joints_dist[p_id] += dist
 
         print('all_persons_joint', person_all_joints_dist)
