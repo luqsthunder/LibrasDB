@@ -153,7 +153,7 @@ class PoseCentroidTracker:
                 # plt.show()
 
                 dt = self.pose_extractor.extract_poses(frame)
-                
+
                 # TODO:
                 # [ok] - extrai o X do centroid de cada pessoa e pega o valor
                 #        do meio como elas estão sentadas vc tem como dividir a

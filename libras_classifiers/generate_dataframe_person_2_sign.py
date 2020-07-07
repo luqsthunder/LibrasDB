@@ -90,6 +90,8 @@ class DataframePerson2Sign:
 
         beg_frame_video = int(sample.frame.iloc[0])
         end_frame_video = int(sample.frame.iloc[-1])
+        print(f'beg_frame : {beg_frame_video}, end_frame: {end_frame_video}\n'\
+               '{sample}')
 
         window_beg = self.video_window[0] if self.video_window[0] != -1 \
             else (end_frame_video - beg_frame_video) // 2
@@ -120,8 +122,8 @@ class DataframePerson2Sign:
                                                            mid_curr_window,
                                                            end_curr_window)
                 who_talking.update({method_name: {'id' :talker_id,
-                                                  'frames': [beg_curr_window, 
-                                                             mid_curr_window, 
+                                                  'frames': [beg_curr_window,
+                                                             mid_curr_window,
                                                              end_curr_window]}})
 
         return who_talking
