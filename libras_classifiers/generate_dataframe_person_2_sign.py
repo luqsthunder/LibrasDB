@@ -58,17 +58,17 @@ class DataframePerson2Sign:
                 frame1 = frame1.values[0, 2:]
                 frame0 = frame0.values[0, 2:]
                 dist = frame1 - frame0
-                print(f'sub           {dist}')
+                print(f'sub p {p_id}       {dist}')
                 dist = np.nan_to_num(dist)
-                print(f'rm na         {dist}')
+                print(f'rm na p {p_id}     {dist}')
                 dist = dist ** 2
-                print(f'pow2          {dist}')
+                print(f'pow2 p {p_id}      {dist}')
                 dist = np.array([np.sum(joint_dist) for joint_dist in dist])
-                print(f'sum each axis {dist}')
+                print(f'sum axis p {p_id}  {dist}')
                 dist = np.sqrt(dist)
-                print(f'sqrt          {dist}')
+                print(f'sqrt p {p_id}      {dist}')
                 dist = np.sum(dist)
-                print(f'sum all       {dist}')
+                print(f'sum all p {p_id}   {dist}')
                 person_all_joints_dist[p_id] += dist
 
         print('all_persons_joint', person_all_joints_dist)
