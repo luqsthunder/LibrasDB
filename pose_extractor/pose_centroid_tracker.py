@@ -125,6 +125,8 @@ class PoseCentroidTracker:
                                                           'centroid'])
 
         for person_sub_id, alone_talk in persons_alone.items():
+            person_sub_id = int(person_sub_id)
+
             video.set(cv.CAP_PROP_POS_FRAMES, alone_talk['beg'])
             end_pos = alone_talk['end']
             fps = video.get(cv.CAP_PROP_FPS)
@@ -218,8 +220,14 @@ class PoseCentroidTracker:
                 df_persons_centroid_video.append(curr_data, ignore_index=True)
 
             not_talking_person_id = 0 if talking_person_id == 1 else 1
+            print(not_talking_person_id, talking_person_id)
+
             not_talker_centroid = persons_body_centroid[not_talking_person_id]
             not_talker_sub_id = 1 if person_sub_id == 2 else 2
+
+            print(not_talker_sub_id, person_sub_id, person_sub_id == 2, 
+                  int(person_sub_id) == 2)
+
             curr_data = pd.DataFrame(data=dict(folder=[folder_path],
                                                talker_id=[not_talker_sub_id],
                                                centroid=[not_talker_centroid]))
