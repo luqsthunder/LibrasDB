@@ -51,6 +51,10 @@ class FindSignalingCentroid:
             if beg_video_frame_value > beg_talks:
                 beg_video_frame_value = beg_talks
 
+        # caso so tenha uma unica pessoa falando no video.
+        if persons.shape[0] == 1:
+            return {str(persons[0]): {'beg': beg_talks, 'end': end_talks}}
+
         end_video_frame_value = end_video_frame_value \
             if end_video_frame_value % 2 != 0 else end_video_frame_value + 1
         talking_frames = [np.zeros((end_video_frame_value + 1, ))

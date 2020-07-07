@@ -109,7 +109,7 @@ class PoseCentroidTracker:
         """
         persons_alone = \
             self.signaler_find.find_where_signalers_talks_alone(folder_path)
-
+        
         # alguns folder_names estão com espaço no inicio de cada diretorios,
         # para copia-los é necessário remover os espaços do inicio do nome
         # dos diretorios.
