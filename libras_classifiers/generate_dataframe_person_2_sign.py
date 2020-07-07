@@ -48,6 +48,7 @@ class DataframePerson2Sign:
 
         persons_id_in_video = all_frames_in_window.person.unique()
         person_all_joints_dist = [0] * len(persons_id_in_video)
+
         for p_id in persons_id_in_video:
             person_joints = \
                 all_frames_in_window[all_frames_in_window['person'] == p_id]
@@ -58,7 +59,8 @@ class DataframePerson2Sign:
                 frame1 = frame1.values[0, 2:]
                 frame0 = frame0.values[0, 2:]
                 dist = frame1 - frame0
-                dist = np.array(list(filter(lambda x: x==x, dist)))
+                dist = np.array(list(filter(
+                    lambda x: not isinstance(x, float), dist)))
                 dist = dist ** 2
                 dist = np.sum(np.array([np.sum(x) for x in dist]))
                 print(f'sum after pow 2: \n {dist}\n')
