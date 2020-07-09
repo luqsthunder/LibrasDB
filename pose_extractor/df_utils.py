@@ -48,16 +48,90 @@ def update_xy_pose_df(datum: DatumLike, df: pd.DataFrame, frame: int,
         'frame': [frame]
     }
 
-    for part in body_parts:
-        try:
-            joint = {part: [datum.poseKeypoints[person_pos_id,
-                                                BODY_PARTS[part]][: 2]]}
-            pose_dic.update(joint)
-        except IndexError:
-            pose_dic.update({part: None})
+    pose_dic.update(make_dict_body_parts(datum, body_parts, person_pos_id))
 
     if hand_parts is not None:
-        for part in hand_parts:
+        pose_dic.update(make_dict_hand_parts(datum, hand_parts, person_pos_id))
+
+    # if head_joints is not None:
+    pose_df = pd.DataFrame(data=pose_dic)
+    return df.append(pose_df, ignore_index=True)
+
+
+def update_xy_pose_df_single_person(datum: DatumLike, df: pd.DataFrame,
+                                    frame: int, person_pos_id: int,
+                                    hand_pos_id: int, body_parts: list,
+                                    hand_parts: list):
+    """
+    Adiciona uma linha no dataframe (df) contendo a pessoa, frame e as juntas
+    do corpo e da mão caso utilizadas.
+
+    Parameters
+    ----------
+    datum: DatumLike
+        Resultado do openpose contendo as juntas.
+
+    df: pd.DataFrame
+        DataFrame das juntas
+
+    frame: int
+        Frame do video correspondente a junta.
+
+    person_pos_id: int
+        posição da pessoa dentro do datum. Cada vez que o openpose processa uma
+        imagem, ele não rastreia os esqueletos. Logo, o id da mesma pessoa
+        entre frames processados pelo openpose pode variar.
+
+    body_parts: list[str]
+        Lista contendo o nome das juntas utilizadas para o corpo. Essas juntas
+        devem ser nomeadas igual ao pose_extractor.all_parts.BODY_PARTS
+
+    hand_parts: list[str]
+        Lista contendo o nome das juntas utilizadas para as mãos. Essas juntas
+        devem ser nomeadas igual ao pose_extractor.all_parts.HAND_PARTS
+
+    Returns
+    -------
+    df: pd.DataFrame
+        dataframe atual com a linha da pose adicionada a ele.
+    """
+
+    pose_dic = {
+        'frame': [frame]
+    }
+
+    pose_dic.update(make_dict_body_parts(datum, body_parts, person_pos_id))
+
+    if hand_parts is not None:
+        pose_dic.update(make_dict_hand_parts(datum, hand_parts, hand_pos_id))
+
+    # if head_joints is not None:
+    pose_df = pd.DataFrame(data=pose_dic)
+    return df.append(pose_df, ignore_index=True)
+
+
+def make_dict_body_parts(datum: DatumLike, body_parts: list,
+                         person_pos_id: int):
+    pose_dic = {}
+    for part in body_parts:
+        if person_pos_id is not None:
+            try:
+                joint = {part: [datum.poseKeypoints[person_pos_id,
+                                                    BODY_PARTS[part]][: 2]]}
+                pose_dic.update(joint)
+            except IndexError:
+                pose_dic.update({part: None})
+        else:
+            pose_dic.update({part: None})
+
+    return pose_dic
+
+
+def make_dict_hand_parts(datum: DatumLike, hand_parts: list,
+                         person_pos_id: int):
+    pose_dic = {}
+    for part in hand_parts:
+        if person_pos_id is not None:
             try:
                 joint_val = datum.handKeypoints[0][person_pos_id,
                                                    HAND_PARTS[part]][: 2]
@@ -73,7 +147,9 @@ def update_xy_pose_df(datum: DatumLike, df: pd.DataFrame, frame: int,
                 pose_dic.update(joint)
             except IndexError:
                 pose_dic.update({(part + 'l'): None})
+        else:
+            pose_dic.update({(part + 'r'): None})
+            pose_dic.update({(part + 'l'): None})
 
-    # if head_joints is not None:
-    pose_df = pd.DataFrame(data=pose_dic)
-    return df.append(pose_df, ignore_index=True)
+    return pose_dic
+
