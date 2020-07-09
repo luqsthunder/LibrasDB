@@ -31,6 +31,9 @@ def process_single_sample(extractor, curr_video, beg, end, person_needed,
     return video_df
 
 db_path = ''
+if db_path == '':
+    raise RuntimeError('esqueceu de setar o db_path')
+
 pose_extractor = OpenposeExtractor('../openpose')
 centroids_df = pd.read_csv('centroids.csv')
 
