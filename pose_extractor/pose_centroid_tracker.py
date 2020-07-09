@@ -3,7 +3,7 @@ import pandas as pd
 import cv2 as cv
 import os
 from copy import copy
-from shutil import copyfile
+from tqdm import tqdm
 from pose_extractor.all_parts import BODY_PARTS_NAMES, HAND_PARTS_NAMES
 from pose_extractor.openpose_extractor import DatumLike, OpenposeExtractor
 from pose_extractor.find_signaling_centroid import FindSignalingCentroid
@@ -20,8 +20,8 @@ class PoseCentroidTracker:
     esqueletos mais distantes que um limitante (threshold).
     """
 
-    def __init__(self, all_video_csv_path, body_dist_threshold=20,
-                 hand_dist_threshold=20, hand_body_dist_threshold=50,
+    def __init__(self, all_video_csv_path, db_path=None, folder_2_track=None,
+                 centroids_df_path=None, openpose_path='../openpose',
                  persons_id=None, body_parts=None, hand_parts=None,
                  head_parts=None):
         """
@@ -40,43 +40,18 @@ class PoseCentroidTracker:
         self.body_parts = BODY_PARTS_NAMES if body_parts is None else body_parts
         self.hands_parts = HAND_PARTS_NAMES if hand_parts is None else hand_parts
         self.head_parts = head_parts
-        self.body_dist_threshold = body_dist_threshold
-        self.hand_dist_threshold = hand_dist_threshold
-        self.hand_body_dist_threshold = hand_body_dist_threshold
 
-        # essa variavel contem informação sobre os corpos, maos e cabeças das
-        # pessoas. A informção esta no seguinte formato:
-        # {
-        #   id: int,                    id principal, indicando a posição na
-        #                               legenda ou primeiro id registro para
-        #                               pessoa.
-        #
-        #   pos_id: int,                Posição da pose da pessoa no datum atual
-        #                               (self.curr_dt).
-        #
-        #   centroid: np.array([x, y]), centroid da pessoa.
-        #
-        #   right_hand_pos_id: int.     Posição da pose da mão direita da pessoa
-        #                               no datum atual.
-        #
-        #   left_hand_pos_id: int       Posição da pose da mão esquerda da
-        #                               pessoa no datum atual.
-        #
-        #   left_hand_centroid: int,    Centroid atual da mão esquerda.
-        #
-        #   right_hand_centroid: int    Centroid atual da mão direita.
-        # }
-        self.all_persons_all_parts_centroid = {}
-
-        self.last_persons_list = None
-        self.last_hands_list = None
         self.curr_dt = None
         self.signaler_find = FindSignalingCentroid(all_video_csv_path)
-        openpose_path = '../openpose/'
         self.pose_extractor = OpenposeExtractor(openpose_path=openpose_path)
         self.person_2_sign = DataframePerson2Sign(None)
 
-    def retrive_persons_centroid_from_sign_df(self, folder_path, db_path, pbar=None):
+        self.centroids_df = pd.read_csv(centroids_df_path) \
+            if centroids_df_path is not None else None
+        self.folder_2_track = folder_2_track
+
+    def retrive_persons_centroid_from_sign_df(self, folder_path, db_path,
+                                              pbar=None):
         """
         Encontra o centroid das pessoas presentes em um video e legenda presente no
         dataframe da base de dados. Relacionando o centroid das pessoas ao id da
@@ -109,17 +84,10 @@ class PoseCentroidTracker:
         """
         persons_alone = \
             self.signaler_find.find_where_signalers_talks_alone(folder_path)
-        
-        # alguns folder_names estão com espaço no inicio de cada diretorios,
-        # para copia-los é necessário remover os espaços do inicio do nome
-        # dos diretorios.
+
         src_file_name = os.path.join(db_path, folder_path)
-        #dst_file_name = './v0.mp4'
-        #copyfile(src_file_name, dst_file_name)
-        #video = cv.VideoCapture(dst_file_name)
         video = cv.VideoCapture(src_file_name)
-        persons_body_centroid = None
-        x_mid_point = None
+
         df_persons_centroid_video = pd.DataFrame(columns=['folder',
                                                           'talker_id',
                                                           'centroid'])
@@ -130,12 +98,15 @@ class PoseCentroidTracker:
             video.set(cv.CAP_PROP_POS_FRAMES, alone_talk['beg'])
             end_pos = alone_talk['end']
             fps = video.get(cv.CAP_PROP_FPS)
-            end_pos = int(alone_talk['beg'] + fps * 5) + 1 if end_pos > int(alone_talk['beg'] + fps * 5) + 1 else end_pos
+            end_pos = int(alone_talk['beg'] + fps * 5) + 1 \
+                if end_pos > int(alone_talk['beg'] + fps * 5) + 1 else end_pos
 
             persons_centroids = [[], []]
             pose_df_cols = ['person', 'frame']
             pose_df_cols.extend(self.body_parts)
-            pose_df_cols.extend(self.hands_parts)
+            pose_df_cols.extend(['l' + x for x in self.hands_parts])
+            pose_df_cols.extend(['r' + x for x in self.hands_parts])
+
             pose_df = pd.DataFrame(columns=pose_df_cols)
 
             if pbar is not None:
@@ -151,23 +122,6 @@ class PoseCentroidTracker:
                 # plt.show()
 
                 dt = self.pose_extractor.extract_poses(frame)
-
-                # TODO:
-                # [ok] - extrai o X do centroid de cada pessoa e pega o valor
-                #        do meio como elas estão sentadas vc tem como dividir a
-                #        cena em 2 e ter menos trabalho para rastreamento.
-                #
-                # [ok] - Separa as pessoas pelo ponto do meio analisando o
-                #        centroid. Todas as duas pessoas presentes na cena,
-                #        são ordenadas da esquerda para direita.
-                #        Logo se o centroid anterior ao meio deve ser a
-                #        posição 0 e o a direita a posição 1.
-                #
-                # [  ] - Checar se os anteriores estão certos.
-
-                #if persons_body_centroid is None:
-                #    persons_body_centroid = list(map(self.make_xy_centroid,
-                #                                     dt.poseKeypoints))
 
                 curr_frame = int(video.get(cv.CAP_PROP_POS_FRAMES))
 
@@ -200,10 +154,6 @@ class PoseCentroidTracker:
                 if pbar is not None:
                     pbar.update(1)
                     pbar.refresh()
-            # TODO:
-            # [ok] - Achar quem tem mais enegergia/distancia gasta na DF e
-            #        atribuir o ID da pessoa na legenda ao centroid dessa
-            #        pessoa.
 
             print(persons_centroids)
             persons_body_centroid = [persons_centroids[0][0], persons_centroids[1][0]]
@@ -235,82 +185,68 @@ class PoseCentroidTracker:
                 df_persons_centroid_video.append(curr_data, ignore_index=True)
             break
 
-        #os.remove(dst_file_name)
         video.release()
         return df_persons_centroid_video
 
-    def __make_persons_list(self, dt):
-        """
-        É construido uma lista dicionarios com ID e centroid a partir do datum
-        passado. Nessa lista é construido sem levar em consideração os ID
-        corretos de cada pessoa. O intuito desse método é apenas organizar as
-        poses.
+    def subdivide_2_persons_scene(self, folder):
+        if self.centroids_df is None:
+            raise ValueError('self.centroids_df must non None if wanted to '
+                             'divide scene')
 
-        Parameters
-        ----------
-        dt: Openpose Datum
-            Datum contendo as poses a serem utilizadas
+        sample = self.centroids_df[self.centroids_df['folder'] == folder]
 
-        Returns
-        -------
-        List[dict]
-            Contém em cada dicionario as inforções do ID relacionado a posição
-            da pessoa no datum e o seu centroid.
-        """
+        x_mid = sum(list(map(lambda x: x[0], sample.centroid))) / 2
 
-        persons_list = []
-        for it, body_pose in enumerate(dt.poseKeypoints):
-            person = {
-                'id': it,
-                'centroid': self.make_xy_centroid(body_pose)}
-            persons_list.append(person)
-        return persons_list
+        left_person_id = sample.loc['talker_id', 0] \
+            if sample.centroid.iloc[0][0] < x_mid \
+            else sample.loc['talker_id', 1]
 
-    def __make_r_hands_list(self, dt: DatumLike):
-        """
-        É construido uma lista dicionarios com ID e centroid a partir do datum
-        passado. Nessa lista é construido sem levar em consideração os ID
-        corretos de cada pessoa. O intuito desse método é apenas organizar as
-        poses.
+        right_person_id = 2 if left_person_id == 1 else 1
 
-        Parameters
-        ----------
-        dt: Openpose Datum
-            Datum contendo as poses a serem utilizadas
+        return x_mid, left_person_id, right_person_id
 
-        Returns
-        -------
-        List[dict]
-            Contém em cada dicionario as inforções do ID relacionado a posição
-            da pessoa no datum e o seu centroid.
-        """
+    def filter_persons_by_x_mid(self, dt):
 
-        hands_list = []
-        for it, hand_pose in enumerate(dt.handsKeypoints[0]):
-            hands = {
-                'id': it,
-                'centroid': self.make_xy_centroid(hand_pose)}
-            hands_list.append(hands)
-        return hands_list
+        if len(dt.poseKeypoints) > 0:
+            curr_body_centroids = list(map(self.make_xy_centroid,
+                                           dt.poseKeypoints))
 
-    def __make_hands_lists(self, dt):
-        """
-        Parameters
-        ----------
-        dt: Openpose Datum
-            Datum contendo as poses a serem utilizadas
+            x_mid_body = sum(map(lambda x: x[0], curr_body_centroids))
+            x_mid_body = x_mid_body / len(curr_body_centroids)
 
-        Returns
-        -------
-        """
+            if len(curr_body_centroids) > 1:
+                left_person_in_dt = 0 \
+                    if curr_body_centroids[0][0] < x_mid_body else 1
+                right_person_in_dt = 1 if left_person_in_dt == 0 else 1
+            else:
+                left_person_in_dt = 0 \
+                    if curr_body_centroids[0][0] < x_mid_body else None
+                right_person_in_dt = 0 \
+                    if curr_body_centroids[0][0] > x_mid_body else None
+        else:
+            left_person_in_dt, right_person_in_dt = None, None
 
-        hands_list = []
-        for it, hands in enumerate(dt.handKeypoints):
-            person = {
-                'id': it,
-                'centroid': self.make_xy_centroid(hands)}
-            hands_list.append(person)
-        return hands_list
+        if len(dt.handKeypoints[0]) > 0:
+            curr_r_hands_centroids = list(map(self.make_xy_centroid,
+                                              dt.poseKeypoints))
+
+            x_mid_hands = sum(map(lambda x: x[0], curr_body_centroids))
+            x_mid_hands = x_mid_hands / len(curr_body_centroids)
+
+            if len(curr_r_hands_centroids) > 1:
+                left_person_r_hand_dt = 0 \
+                    if curr_r_hands_centroids[0][0] < x_mid_hands else 1
+                right_person_r_hand_dt = 1 if left_person_r_hand_dt == 0 else 1
+            else:
+                left_person_r_hand_dt = 0 \
+                    if curr_r_hands_centroids[0][0] < x_mid_hands else None
+                right_person_r_hand_dt = 0 \
+                    if curr_r_hands_centroids[0][0] < x_mid_hands else None
+        else:
+            left_person_r_hand_dt, right_person_r_hand_dt = None, None
+
+        return ([left_person_in_dt, left_person_r_hand_dt],
+                [right_person_in_dt, right_person_r_hand_dt])
 
     def __remove_unused_joints(self, dt: DatumLike):
         """
@@ -320,94 +256,9 @@ class PoseCentroidTracker:
         """
         pass
 
-    def update(self, datum: DatumLike, curr_frame):
+    def update(self, datum: DatumLike):
         self.curr_dt = copy(datum)
-        self.clean_current_datum()
-
-        # TODO:
-        # [  ] - checar o meio atual, separar os IDs nos datums.
-        # [  ] - Atribuir o ID relacionado a cada lado.
-
-
-    def get_from_id_persons(self, person_id):
-        pass
-
-    def hand_owners_by_centroid(self):
-        pass
-
-    def update_persons_list(self, person_lists):
-        """
-        Atualiza a lista de pessoas baseado no centroid anterior e atual.
-
-        Nessa função é associado o centroid mais proximo da lista velha com os
-        novos calculados.
-
-        param: person_lists: list
-
-        return: persons: list
-            lista de pessoas com os seus respectivos id corrigidos e seus
-            centroides atuais.
-        """
-
-        persons = []
-        for old_person in self.last_persons_list:
-            failed_2_track = False
-            correct_pos_id, centroid, dist, _ = \
-                self.find_closest_centroid(person_lists,
-                                           old_person['centroid'])
-
-            if dist > self.body_dist_threshold:
-                centroid = old_person['centroid']
-                correct_pos_id = old_person['id']
-                failed_2_track = True
-
-            persons.append({
-                'id': correct_pos_id,
-                'centroid': centroid,
-                'failed': failed_2_track
-            })
-        return persons
-
-    @staticmethod
-    def find_closest_centroid(curr_persons_list, old_centroid):
-        """
-        Função para achar o centroid mais próximo das pessoas dentro da
-        curr_person_list em relação ao old_centroid
-
-        Parameters
-        ----------
-        curr_persons_list: list
-
-
-        old_centroid: np.array([x, y])
-
-        Returns
-        -------
-        closest_centroid: np.array([x, y]), correct_pos_id: int,
-        curr_person_dist: float
-            O closest_centroid indica o centroid mais proximo das pessoas
-            presentes na lista atual em relação ao antigo. O correct_pos_id é a
-            posição da pessoa correspondente ao centroid antigo na nova lista.
-            E curr_person_dist é a distância entre o centroid antigo e novo.
-
-        """
-        correct_pos_id = -1
-        curr_person_dist = 9999999
-        closest_centroid = None
-
-        for c_person in curr_persons_list:
-            if c_person['centroid'].size == 0:
-                continue
-
-            centroids_dist = \
-                np.linalg.norm(old_centroid - c_person['centroid'])
-
-            if centroids_dist < curr_person_dist:
-                curr_person_dist = centroids_dist
-                correct_pos_id = c_person['id']
-                closest_centroid = c_person['centroid']
-
-        return closest_centroid, correct_pos_id, curr_person_dist
+        # self.clean_current_datum()
 
     @staticmethod
     def make_xy_centroid(pose):
@@ -432,34 +283,3 @@ class PoseCentroidTracker:
         centroid = np.array([x_part / length, y_part / length])
 
         return centroid
-
-
-class PoseAngleDataframe:
-    """
-    Classe para axiliar na construção dos dataframes das poses em angulos.
-
-    Essa classe pode ser utilizada com contexto do python e.g:
-
-    ```
-    with PoseAngleDataframe(['Neck', 'Nose', ...], 'my-pose-df.csv') as pad:
-        # process
-    ```
-
-    """
-
-    def __init__(self, joint_names, output_file):
-        self.joint_names = joint_names
-        self.df = pd.DataFrame()
-        self.output_file = output_file
-
-    def update_dataframe(self, new_poses):
-        pass
-
-    def close(self):
-        self.__exit__()
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, exc_type=None, exc_val=None, exc_tb=None):
-        self.df.to_csv(self.output_file)
