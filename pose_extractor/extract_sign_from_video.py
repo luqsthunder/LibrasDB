@@ -23,7 +23,8 @@ def process_single_sample(extractor, curr_video, beg, end, person_needed,
         dt = extractor.extract_poses(frame)
         curr_frame = int(curr_video.get(cv.CAP_PROP_POS_FRAMES))
         persons_id = pose_tracker.filter_persons_by_x_mid(dt)
-        video_df = update_xy_pose_df_single_person(dt, df, curr_frame,
+        video_df = update_xy_pose_df_single_person(dt, video_df,
+                                                   curr_frame,
                                                    persons_id[in_need_id][0],
                                                    persons_id[in_need_id][1],
                                                    pose_tracker.body_parts,
@@ -80,11 +81,12 @@ for f_name in tqdm(centroid_folder_names, desc='folders'):
         if os.path.exists(sample_path):
             continue
 
-        df = process_single_sample(pose_extractor, video, sign.beg, sign.end,
-                                   sign.talker_id, curr_left_person_sub_id)
-
-        if df is not None:
-            df.to_csv(sample_path)
+        print('processing')
+        # df = process_single_sample(pose_extractor, video, sign.beg, sign.end,
+        #                            sign.talker_id, curr_left_person_sub_id)
+        #
+        # if df is not None:
+        #     df.to_csv(sample_path)
 
     video.release()
 
