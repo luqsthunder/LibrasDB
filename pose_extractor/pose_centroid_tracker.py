@@ -49,6 +49,25 @@ class PoseCentroidTracker:
         self.centroids_df = pd.read_csv(centroids_df_path) \
             if centroids_df_path is not None else None
         self.folder_2_track = folder_2_track
+        if self.centroids_df is not None:
+            self.centroids_df['centroid'] = \
+                self.centroids_df['centroid'].apply(self.parse_npy_vec_str)
+        print('end')
+
+    @staticmethod
+    def parse_npy_vec_str(str_array_like):
+        if not isinstance(str_array_like, str):
+            return str_array_like
+
+        res = str_array_like[1:len(str_array_like) - 1].split(' ')
+        recovered_np_array = []
+        for r in res:
+            if r == '' or ' ' in r:
+                continue
+            f = float(r)
+            recovered_np_array.append(f)
+        return np.array(recovered_np_array)
+
 
     def retrive_persons_centroid_from_sign_df(self, folder_path, db_path,
                                               pbar=None):
@@ -197,9 +216,9 @@ class PoseCentroidTracker:
 
         x_mid = sum(list(map(lambda x: x[0], sample.centroid))) / 2
 
-        left_person_id = sample.loc['talker_id', 0] \
+        left_person_id = sample['talker_id'].iloc[0] \
             if sample.centroid.iloc[0][0] < x_mid \
-            else sample.loc['talker_id', 1]
+            else sample['talker_id'].iloc[1]
 
         right_person_id = 2 if left_person_id == 1 else 1
 

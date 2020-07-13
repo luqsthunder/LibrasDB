@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 import pandas as pd
 import numpy as np
 import sys
@@ -86,7 +88,7 @@ class OpenposeExtractor:
                   'right folder?')
             raise e
 
-    def extract_poses(self, img, filter_low_acc=None) -> DatumLike:
+    def extract_poses(self, img, filter_low_acc=None):
         datum = op.Datum()
         datum.cvInputData = img
         self.op_wrapper.emplaceAndPop([datum])
