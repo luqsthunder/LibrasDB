@@ -117,7 +117,8 @@ def make_dict_body_parts(datum: DatumLike, body_parts: list,
         if person_pos_id is not None:
             try:
                 joint = {part: [datum.poseKeypoints[person_pos_id,
-                                                    BODY_PARTS[part]][: 2]]}
+                                                    BODY_PARTS[part]]]#[: 2]]
+                         }
                 pose_dic.update(joint)
             except IndexError:
                 pose_dic.update({part: None})
@@ -134,22 +135,22 @@ def make_dict_hand_parts(datum: DatumLike, hand_parts: list,
         if person_pos_id is not None:
             try:
                 joint_val = datum.handKeypoints[0][person_pos_id,
-                                                   HAND_PARTS[part]][: 2]
-                joint = {(part + 'r'): [joint_val]}
+                                                   HAND_PARTS[part]]#[: 2]
+                joint = {('r-' + part): [joint_val]}
                 pose_dic.update(joint)
             except IndexError:
-                pose_dic.update({(part + 'r'): None})
+                pose_dic.update({('r-' + part): None})
 
             try:
                 joint_val = datum.handKeypoints[1][person_pos_id,
-                                                   HAND_PARTS[part]][: 2]
-                joint = {(part + 'l'): [joint_val]}
+                                                   HAND_PARTS[part]]#[: 2]
+                joint = {('l-' + part): [joint_val]}
                 pose_dic.update(joint)
             except IndexError:
-                pose_dic.update({(part + 'l'): None})
+                pose_dic.update({('l-' + part): None})
         else:
-            pose_dic.update({(part + 'r'): None})
-            pose_dic.update({(part + 'l'): None})
+            pose_dic.update({('r-' + part): None})
+            pose_dic.update({('l-' + part): None})
 
     return pose_dic
 

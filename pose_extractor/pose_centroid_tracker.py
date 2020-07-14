@@ -236,7 +236,7 @@ class PoseCentroidTracker:
             if len(curr_body_centroids) > 1:
                 left_person_in_dt = 0 \
                     if curr_body_centroids[0][0] < x_mid_body else 1
-                right_person_in_dt = 1 if left_person_in_dt == 0 else 1
+                right_person_in_dt = 1 if left_person_in_dt == 0 else 0
             else:
                 left_person_in_dt = 0 \
                     if curr_body_centroids[0][0] < x_mid_body else None
@@ -255,7 +255,7 @@ class PoseCentroidTracker:
             if len(curr_r_hands_centroids) > 1:
                 left_person_r_hand_dt = 0 \
                     if curr_r_hands_centroids[0][0] < x_mid_hands else 1
-                right_person_r_hand_dt = 1 if left_person_r_hand_dt == 0 else 1
+                right_person_r_hand_dt = 1 if left_person_r_hand_dt == 0 else 0
             else:
                 left_person_r_hand_dt = 0 \
                     if curr_r_hands_centroids[0][0] < x_mid_hands else None
