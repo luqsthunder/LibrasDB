@@ -10,7 +10,7 @@ import cv2 as cv
 import pandas as pd
 
 def process_single_sample(extractor, curr_video, beg, end, person_needed,
-                          left_person):
+                          left_person, first_x_mid):
     curr_video.set(cv.CAP_PROP_POS_FRAMES, beg)
     curr_frame = int(curr_video.get(cv.CAP_PROP_POS_FRAMES))
     in_need_id = 0 if person_needed == left_person else 1
@@ -27,9 +27,11 @@ def process_single_sample(extractor, curr_video, beg, end, person_needed,
         dt = extractor.extract_poses(frame)
 
         curr_frame = int(curr_video.get(cv.CAP_PROP_POS_FRAMES))
-        persons_id = pose_tracker.filter_persons_by_x_mid(dt)
-        curr_centroid = pose_tracker.make_xy_centroid(dt.poseKeypoints[persons_id[in_need_id][0]])
-        debug_centroids.append(curr_centroid)
+        persons_id = pose_tracker.filter_persons_by_x_mid(dt, first_x_mid)
+        # pose_to_centroid = dt.poseKeypoints[persons_id[in_need_id][0]]
+        # curr_centroid = \
+        #     pose_tracker.make_xy_centroid(pose_to_centroid)
+        # debug_centroids.append(curr_centroid)
         video_df = update_xy_pose_df_single_person(dt, video_df,
                                                    curr_frame,
                                                    persons_id[in_need_id][0],
@@ -37,10 +39,10 @@ def process_single_sample(extractor, curr_video, beg, end, person_needed,
                                                    pose_tracker.body_parts,
                                                    pose_tracker.hands_parts)
 
-    mean_x_cent = 0
-    for x in debug_centroids:
-        mean_x_cent += x[0]
-    mean_x_cent = mean_x_cent / len(debug_centroids)
+    # mean_x_cent = 0
+    # for x in debug_centroids:
+    #     mean_x_cent += x[0] if x is not None else 0
+    # mean_x_cent = mean_x_cent / len(debug_centroids)
     # print(mean_x_cent)
     return video_df
 
@@ -82,7 +84,7 @@ folders_name_map = {x.split('v')[-1]: x
 centroid_folder_names = sorted(list(centroids_df.folder.unique()))
 processed_signs_count = {x: 0 for x in needed_signs}
 for f_name in tqdm(centroid_folder_names, desc='folders'):
-    print(f'beg video {f_name}: ')
+    print(f'\n beg video {f_name}: ')
 
     v_part = f_name.split(' v')[-1].split('/')[0]
     new_folder_name = folders_name_map[v_part]
@@ -117,17 +119,19 @@ for f_name in tqdm(centroid_folder_names, desc='folders'):
         if processed_signs_count[sign.sign] >= 40:
             continue
 
-        print(f'beg sign {sign.sign}')
         sign_name = no_unicode_need_signs[sign.sign]
         sample_name = f'sample-xy-500ms-{new_folder_name}-{sign_name}-beg-{sign.beg}-end-{sign.end}.csv'
         sample_path = os.path.join(sign_path, sample_name)
         if os.path.exists(sample_path):
+            processed_signs_count[sign.sign] += 1
             continue
 
+        print(f'\n beg sign {sign.sign}')
         #beg = sign.beg - 500 if sign.beg - 500 > 0 else 0
         df = process_single_sample(pose_tracker.pose_extractor,
                                    video, sign.beg-500, sign.end+500,
-                                   sign.talker_id, curr_left_person_sub_id)
+                                   sign.talker_id, curr_left_person_sub_id,
+                                   curr_x_mid)
         #print(df)
         if df is not None:
             df.to_csv(sample_path)

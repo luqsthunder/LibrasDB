@@ -224,9 +224,9 @@ class PoseCentroidTracker:
 
         return x_mid, left_person_id, right_person_id
 
-    def filter_persons_by_x_mid(self, dt):
+    def filter_persons_by_x_mid(self, dt, first_x_mid):
 
-        if len(dt.poseKeypoints) > 0:
+        if dt.poseKeypoints.size > 1:
             curr_body_centroids = list(map(self.make_xy_centroid,
                                            dt.poseKeypoints))
 
@@ -239,13 +239,13 @@ class PoseCentroidTracker:
                 right_person_in_dt = 1 if left_person_in_dt == 0 else 0
             else:
                 left_person_in_dt = 0 \
-                    if curr_body_centroids[0][0] < x_mid_body else None
+                    if curr_body_centroids[0][0] < first_x_mid else None
                 right_person_in_dt = 0 \
-                    if curr_body_centroids[0][0] > x_mid_body else None
+                    if curr_body_centroids[0][0] > first_x_mid else None
         else:
             left_person_in_dt, right_person_in_dt = None, None
 
-        if len(dt.handKeypoints[0]) > 0:
+        if dt.handKeypoints[0].size > 1:
             curr_r_hands_centroids = list(map(self.make_xy_centroid,
                                               dt.poseKeypoints))
 
@@ -258,9 +258,9 @@ class PoseCentroidTracker:
                 right_person_r_hand_dt = 1 if left_person_r_hand_dt == 0 else 0
             else:
                 left_person_r_hand_dt = 0 \
-                    if curr_r_hands_centroids[0][0] < x_mid_hands else None
+                    if curr_r_hands_centroids[0][0] < first_x_mid else None
                 right_person_r_hand_dt = 0 \
-                    if curr_r_hands_centroids[0][0] < x_mid_hands else None
+                    if curr_r_hands_centroids[0][0] < first_x_mid else None
         else:
             left_person_r_hand_dt, right_person_r_hand_dt = None, None
 
