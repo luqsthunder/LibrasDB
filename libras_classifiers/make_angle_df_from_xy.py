@@ -1,7 +1,6 @@
 from libras_classifiers.librasdb_loaders import DBLoader2NPY
 from pose_extractor.all_parts import *
 
-from copy import copy
 from tqdm.auto import tqdm
 from concurrent.futures import ThreadPoolExecutor
 
@@ -92,13 +91,12 @@ def make_angle_df_from_xy(sample: pd.DataFrame, no_hands=False, pbar: tqdm = Non
     df_cols = ['frame'] + ['-'.join(x) for x in BODY_ANGLE_PAIRS] + ['l-' + ('-'.join(x)) for x in HAND_ANGLE_PAIRS] + \
               ['r-' + ('-'.join(x)) for x in HAND_ANGLE_PAIRS]
     pose_angle_df = pd.DataFrame()
-    m_sample = sample.copy()
     if pbar is not None:
-        pbar.reset(total=m_sample.shape[0])
+        pbar.reset(total=sample.shape[0])
         if sample_name is not None:
             pbar.set_description(f'{sample_name}')
 
-    for row in m_sample.iterrows():
+    for row in sample.iterrows():
         row = row[1]
         angle_data = {}
         angle_data.update({'frame': [row.frame]})
@@ -147,50 +145,26 @@ def convert_all_samples_xy_2_angle(db_path, no_hands=False):
 
     dir_before_samples_name = ('no_hands' if no_hands else 'hands') + '-angle'
 
+    #sample_pbar = tqdm(position=2)
+
     amount_samples = count_samples_in_database(db_path, no_hands)
     folder_pbar = tqdm(position=1)
     folder_pbar.reset(total=amount_samples)
-    db_generator = yield_all_db_samples(db_path, no_hands)
 
-    amount_workers = multiprocessing.cpu_count() // 2
-    thread_executor = \
-        ThreadPoolExecutor(max_workers=amount_workers*2)
+    for sample_xy, class_name, sample_name in yield_all_db_samples(db_path, no_hands):
+        sample_path = os.path.join(db_path, class_name, dir_before_samples_name, sample_name)
 
-    sample_pbars = [tqdm(position=(x + 1)) for x in range(1, 3)]
+        if os.path.exists(sample_path):
+            folder_pbar.update(1)
+            folder_pbar.refresh()
+            continue
 
-    for _ in range(0, amount_samples, amount_workers):
+        folder_pbar.set_description(class_name)
 
-        # sample_xy1, class_name1, sample_name1 = next(db_generator)
-        # sample_xy2, class_name2, sample_name2 = next(db_generator)
-        # sample_xy3, class_name3, sample_name3 = next(db_generator)
-        # sample_xy4, class_name4, sample_name4 = next(db_generator)
+        sample_angle_df = make_angle_df_from_xy(sample_xy, no_hands, pbar=None, sample_name=sample_name)
+        sample_angle_df.to_csv(sample_path)
 
-        data_list = [next(db_generator) for _ in range(amount_workers)]
-        folder_pbar.set_description(data_list[0][1])
-
-        futures = [
-            thread_executor.submit(make_angle_df_from_xy, x[0], x[1], sample_pbars[it], x[2])
-            for it, x in enumerate(data_list) if not os.path.exists(os.path.join(db_path, data_list[it][1],
-                                                                                 dir_before_samples_name,
-                                                                                 data_list[it][2]))
-        ]
-
-        all_done = [False] * len(futures)
-        while not all(all_done):
-            all_done = [f.done() for f in futures]
-
-        res = [f.result() for f in futures]
-
-        for it, r in enumerate(res):
-            if r is None:
-                continue
-            sample_path = os.path.join(db_path, data_list[it][1], dir_before_samples_name, data_list[it][2])
-            r.to_csv(sample_path)
-
-        # sample_angle_df = make_angle_df_from_xy(sample_xy, no_hands, pbar=sample_pbar, sample_name=sample_name)
-        # sample_path = os.path.join(db_path,  class_name, dir_before_samples_name, sample_name)
-        # sample_angle_df.to_csv(sample_path)
-        folder_pbar.update(amount_workers)
+        folder_pbar.update(1)
         folder_pbar.refresh()
 
 
