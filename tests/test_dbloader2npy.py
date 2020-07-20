@@ -1,6 +1,6 @@
 from libras_classifiers.librasdb_loaders import DBLoader2NPY
 
-import tensorflow as tf
+#import tensorflow as tf
 
 
 class TestDBLoader2npy:
@@ -8,20 +8,25 @@ class TestDBLoader2npy:
     BATCH_SIZE = 8
 
     def setup(self):
-        self.db = DBLoader2NPY('C:/Users/lucas/Downloads/libras-db',
+        self.db = DBLoader2NPY('../libras-db-folders',
+                               angle_pose=False,
+                               no_hands=False,
                                batch_size=self.BATCH_SIZE)
-        self.dbxy = DBLoader2NPY('C:/Users/lucas/Downloads/libras-db',
+        self.dbxy = DBLoader2NPY('../libras-db-folders',
                                  batch_size=self.BATCH_SIZE,
-                                 angle_pose=False)
+                                 angle_pose=False,
+                                 no_hands=False,)
 
     def test_constructor(self):
         try:
-            self.db = DBLoader2NPY('C:/Users/lucas/Downloads/libras-db',
+            self.db = DBLoader2NPY('../libras-db-folders', angle_pose=False,
+                                   no_hands=False,
                                    batch_size=self.BATCH_SIZE)
             assert len(self.db.cls_dirs) > 0
             assert len(self.db.samples_path) > 0
 
-            self.dbxy = DBLoader2NPY('C:/Users/lucas/Downloads/libras-db',
+            self.dbxy = DBLoader2NPY('../libras-db-folders',
+                                     no_hands=False,
                                      batch_size=self.BATCH_SIZE,
                                      angle_pose=False)
             assert len(self.db.cls_dirs) > 0
