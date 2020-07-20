@@ -66,3 +66,13 @@ BODY_PAIRS = [ ["Neck",      "RShoulder"],
                ["Nose",      "LEye"],
                ["LEye",      "LEar"]
              ]
+
+BODY_ANGLE_PAIRS = [
+    [0, 1, 2], [0, 1, 5], [0, 1, 11], [0, 1, 8], [1, 5, 6], [1, 2, 3], [2, 3, 4], [5, 6, 7], [8, 9, 10], [11, 12, 13]]
+
+BODY_ANGLE_PAIRS = [[INV_BODY_PARTS[x[0]], INV_BODY_PARTS[x[1]], INV_BODY_PARTS[x[2]]] for x in BODY_ANGLE_PAIRS]
+
+HAND_ANGLE_PAIRS = [[0, 1, 2], [1, 2, 3], [2, 3, 4], [0, 5, 6], [5, 6, 7], [6, 7, 8], [0, 9, 10], [9, 10, 11],
+                    [10, 11, 12], [0, 13, 14], [13, 14, 15], [14, 15, 16], [0, 17, 18], [17, 18, 19], [18, 19, 20]]
+
+HAND_ANGLE_PAIRS = [[INV_HAND_PARTS[x[0]], INV_HAND_PARTS[x[1]], INV_HAND_PARTS[x[2]]] for x in HAND_ANGLE_PAIRS]
