@@ -161,9 +161,7 @@ class AllEAFParser2CSV:
                 if has_subs_diff:
                     for it in range(len(subs)):
                         dif_df = pd.DataFrame(columns=df_cols)
-                        only_video_name = video[0].split('\\')[-1]
-                        name_df = f'v-{only_video_name}-({amount_dups})' \
-                                   'diff_df-it-{it}.csv'
+                        name_df = f'v-({amount_dups})diff_df-it-{it}.csv'
                         name_df = os.path.join(path_to_save_sign_df, name_df)
                         self.__update_sign_df(dif_df, subs[it],
                                               time_stamps[it],
