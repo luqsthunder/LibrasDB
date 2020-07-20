@@ -2,11 +2,12 @@ import os
 import math
 import numpy as np
 import pandas as pd
-import tensorflow as tf
+#import tensorflow as tf
+from tqdm.auto import tqdm
 import sklearn as sk
 
 
-class DBLoader2NPY(tf.keras.utils.Sequence):
+class DBLoader2NPY:#(tf.keras.utils.Sequence):
     """
     Responsavem por carregar as poses dos CSVs para formato usavel pelo keras
     pytorch ou outros frameworks que utilizam numpy.
@@ -199,7 +200,7 @@ class DBLoader2NPY(tf.keras.utils.Sequence):
                                          clean_nan=clean_nan)
 
     @staticmethod
-    def __parse_npy_vec_str(str_array_like):
+    def parse_npy_vec_str(str_array_like):
         if not isinstance(str_array_like, str):
             return str_array_like
 
@@ -234,7 +235,7 @@ class DBLoader2NPY(tf.keras.utils.Sequence):
                 sample = self.__clean_sample(sample)
 
             if not self.angle_pose:
-                sample = sample.applymap(self.__parse_npy_vec_str)
+                sample = sample.applymap(self.parse_npy_vec_str)
 
             self.samples_memory[pos] = sample
         elif self.samples_memory is not None and self.maintain_memory:
@@ -246,7 +247,7 @@ class DBLoader2NPY(tf.keras.utils.Sequence):
                 sample = self.__clean_sample(sample)
 
             if not self.angle_pose:
-                sample = sample.applymap(self.__parse_npy_vec_str)
+                sample = sample.applymap(self.parse_npy_vec_str)
 
         class_vec = np.zeros((len(self.cls_dirs), ))
         idx_test = self.samples_path[pos][1]
