@@ -145,7 +145,7 @@ def convert_all_samples_xy_2_angle(db_path, no_hands=False):
 
     dir_before_samples_name = ('no_hands' if no_hands else 'hands') + '-angle'
 
-    #sample_pbar = tqdm(position=2)
+    sample_pbar = tqdm(position=2)
 
     amount_samples = count_samples_in_database(db_path, no_hands)
     folder_pbar = tqdm(position=1)
@@ -161,7 +161,7 @@ def convert_all_samples_xy_2_angle(db_path, no_hands=False):
 
         folder_pbar.set_description(class_name)
 
-        sample_angle_df = make_angle_df_from_xy(sample_xy, no_hands, pbar=None, sample_name=sample_name)
+        sample_angle_df = make_angle_df_from_xy(sample_xy, no_hands, pbar=sample_pbar, sample_name=sample_name)
         sample_angle_df.to_csv(sample_path)
 
         folder_pbar.update(1)
