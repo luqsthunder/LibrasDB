@@ -2,12 +2,12 @@ import os
 import math
 import numpy as np
 import pandas as pd
-#import tensorflow as tf
+import tensorflow as tf
 from tqdm.auto import tqdm
 import sklearn as sk
 
 
-class DBLoader2NPY:#(tf.keras.utils.Sequence):
+class DBLoader2NPY(tf.keras.utils.Sequence):
     """
     Responsavem por carregar as poses dos CSVs para formato usavel pelo keras
     pytorch ou outros frameworks que utilizam numpy.
@@ -86,6 +86,7 @@ class DBLoader2NPY:#(tf.keras.utils.Sequence):
         self.maintain_memory = maintain_memory
         self.samples_memory = [None for _ in range(len(self.samples_path))]
         self.longest_sample = None
+        print('finding longest sample constructor')
         self.longest_sample = self.find_longest_sample()
         self.weight_2_samples = None
 
@@ -100,7 +101,7 @@ class DBLoader2NPY:#(tf.keras.utils.Sequence):
         """
         if self.longest_sample is None:
             db_idx = [x for x in range(len(self.samples_path))]
-            len_size, y = self.batch_load_samples(db_idx, as_npy=False)
+            len_size, y = self.batch_load_samples(db_idx, as_npy=False, pbar=tqdm())
             len_size = max(len_size, key=lambda x: x.shape[0]).shape[0]
             return len_size
         else:
@@ -281,7 +282,7 @@ class DBLoader2NPY:#(tf.keras.utils.Sequence):
                 self.samples_memory[it] = sample.append(empty_df,
                                                         ignore_index=True)
 
-    def batch_load_samples(self, samples_idxs, as_npy=True, clean_nan=True):
+    def batch_load_samples(self, samples_idxs, as_npy=True, clean_nan=True, pbar: tqdm = None):
         """
         Parameters
         ----------
@@ -295,11 +296,17 @@ class DBLoader2NPY:#(tf.keras.utils.Sequence):
         clean_nan : bool
             Boleano indicando se deve ser limpo as amostras com nulos.
 
+        pbar: tqdm
+            Progress bar to use while loading samples
+
         Returns
         -------
 
         """
 
+        if pbar is not None:
+            pbar.reset(total=len(samples_idxs))
+            pbar.set_description('loading samples')
         X = []
         Y = []
         for idx in samples_idxs:
@@ -308,16 +315,21 @@ class DBLoader2NPY:#(tf.keras.utils.Sequence):
             X.append(x.values if as_npy else x)
             Y.append(y)
 
+            if pbar is not None:
+                pbar.update(1)
+                pbar.refresh()
+
         if as_npy:
             shape_before = X[0].shape
             new_shape = [len(samples_idxs)]
             new_shape.extend(list(shape_before))
             new_shape = tuple(new_shape)
+            #print(shape_before, new_shape, [x.shape for x in X])
             X = np.concatenate(X).reshape(new_shape)
 
-        shape_before = Y[0].shape
-        Y = np.concatenate(Y).reshape(len(samples_idxs), shape_before[0],
-                                      shape_before[1])
+            shape_before = Y[0].shape
+            Y = np.concatenate(Y).reshape(len(samples_idxs), shape_before[0], shape_before[1])
+
         return X, Y
 
     def __getitem__(self, index):
@@ -328,8 +340,11 @@ class DBLoader2NPY:#(tf.keras.utils.Sequence):
             else self.db_length()
 
         x, y = self.batch_load_samples(list(range(beg, end)))
-        x = x[:, :, 2:]
-        return x, y
+
+        # the first coordinate of features is frame and we not need it.
+        x = x[:, :, 1:]
+        #print(f'{index}: {beg}->{end} shape: {x.shape}, {y.shape}')
+        return x, y, [None]
 
     def __len__(self):
         """

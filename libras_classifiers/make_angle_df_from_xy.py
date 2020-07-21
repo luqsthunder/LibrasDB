@@ -2,21 +2,33 @@ from libras_classifiers.librasdb_loaders import DBLoader2NPY
 from pose_extractor.all_parts import *
 
 from tqdm.auto import tqdm
-from concurrent.futures import ThreadPoolExecutor
 
 import os
 import pandas as pd
 import numpy as np
-import multiprocessing
 
 
 def convert_xypose_to_dir_angle(first_pose, second_pose, third_pose):
     """
+    Converte as três poses XY em angulos.
+
+    Calcula o angulo entre as três poses. com os vetores first_pose->second_pose, second_pose->third_pose.
+
     Parameters
     ----------
+    first_pose: np.array
+        np.array([x, y]) com as coordenadas da imagem.
+
+    second_pose: np.array
+        np.array([x, y]) com as coordenadas da imagem.
+
+    third_pose: np.array
+        np.array([x, y]) com as coordenadas da imagem.
 
     Returns
     -------
+        Angulo direcionado entre as poses. E caso aconteça algum erro na execução None sera retornado.
+
     """
     try:
         first_vec = np.array(second_pose) - np.array(first_pose)
@@ -88,8 +100,6 @@ def make_angle_df_from_xy(sample: pd.DataFrame, no_hands=False, pbar: tqdm = Non
 
         return angle
 
-    df_cols = ['frame'] + ['-'.join(x) for x in BODY_ANGLE_PAIRS] + ['l-' + ('-'.join(x)) for x in HAND_ANGLE_PAIRS] + \
-              ['r-' + ('-'.join(x)) for x in HAND_ANGLE_PAIRS]
     pose_angle_df = pd.DataFrame()
     if pbar is not None:
         pbar.reset(total=sample.shape[0])

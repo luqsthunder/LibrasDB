@@ -28,30 +28,47 @@ def data_generator(batchsize, db, amount_epochs, mode='train', random=False,
             yield X, y
         print('finished epoch')
 
-db = DBLoader2NPY('C:/Users/lucas/Downloads/libras-db')
+
+batch_size = 8
+epochs = 10
+db = DBLoader2NPY('../libras-db-folders', batch_size=batch_size,
+                  no_hands=False, angle_pose=False)
 db.fill_samples_absent_frames_with_na()
 
 max_len_seq = db.find_longest_sample()
-amount_joints_used = len(db.joints_used()) - 2
+amount_joints_used = len(db.joints_used()) - 1
+
+distributed_flatten = tf.keras.layers.TimeDistributed(tf.keras.layers.Flatten(), input_shape=(max_len_seq,
+                                                                                              amount_joints_used,
+                                                                                              amount_joints_used))
 
 lstm_layer = \
     tf.keras.layers.LSTM(units=120, activation='tanh',
                          recurrent_activation='sigmoid',
-                         return_sequences=False,
-                         input_shape=(max_len_seq, amount_joints_used))
+                         return_sequences=True,
+
+                         #input_shape=(max_len_seq, amount_joints_used)
+                         )
 
 lstm_layer2 = \
     tf.keras.layers.LSTM(units=80, activation='tanh',
+                         recurrent_activation='sigmoid',
+                         return_sequences=True)
+
+lstm_layer3 = \
+    tf.keras.layers.LSTM(units=60, activation='tanh',
                          recurrent_activation='sigmoid',
                          return_sequences=False)
 
 amount_classes = db.amount_classes()
 
 net = tf.keras.Sequential()
+net.add(distributed_flatten)
 net.add(lstm_layer)
-# net.add(lstm_layer2)
-net.add(tf.keras.layers.Dense(units=amount_classes,
-                              activation='softmax'))
+net.add(lstm_layer2)
+net.add(lstm_layer3)
+net.add(tf.keras.layers.Dense(units=amount_classes, activation='softmax'))
+net.summary()
 try:
     net.compile(optimizer='Adam',
                 loss='categorical_crossentropy',
@@ -60,11 +77,7 @@ except ValueError as e:
     print(e)
 
 try:
-    batch_size = 8
-    epochs = 10
-
-    net.fit(x=data_generator(batch_size, db, epochs),
-            epochs=epochs, verbose=2,
+    net.fit(x=db, epochs=epochs, verbose=2,
             steps_per_epoch=db.db_length() // batch_size)
 except BaseException as e:
     print(e)
