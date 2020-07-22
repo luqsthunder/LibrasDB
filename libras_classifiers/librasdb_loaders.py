@@ -18,7 +18,7 @@ class DBLoader2NPY(tf.keras.utils.Sequence):
     def __init__(self, db_path, batch_size, angle_pose=True, no_hands=True,
                  maintain_memory=True, make_k_fold=False, k_fold_amount=None,
                  const_none_angle_rep=-9999,
-                 const_none_xy_rep=np.array([-9999, -9999])):
+                 const_none_xy_rep=np.array([-9999, -9999, -9999])):
         """
         Parameters
         ----------
@@ -85,8 +85,8 @@ class DBLoader2NPY(tf.keras.utils.Sequence):
 
         self.maintain_memory = maintain_memory
         self.samples_memory = [None for _ in range(len(self.samples_path))]
+        self.samples_memory_xy_npy = [None for _ in range(len(self.samples_path))]
         self.longest_sample = None
-        print('finding longest sample constructor')
         self.longest_sample = self.find_longest_sample()
         self.weight_2_samples = None
 
@@ -171,8 +171,15 @@ class DBLoader2NPY(tf.keras.utils.Sequence):
         # Como vai ser convertido de str para vetor apos ser carregado, isso
         # evita o erro do pandas não aceitar preencher nulos com um np.array.
         xy_str_rep = str(self.const_none_xy_rep)
-        return sample.fillna(self.const_none_angle_rep
-                             if self.angle_pose else xy_str_rep)
+        m_sample = sample.copy()
+
+        if not self.angle_pose:
+            zero_rep = str(np.array([0., 0., 0.]))
+            m_sample = m_sample.replace(zero_rep, np.nan)
+
+
+        return m_sample.fillna(self.const_none_angle_rep
+                               if self.angle_pose else xy_str_rep)
 
     def __load_sample(self, class_name, num, clean_nan=True):
         """
@@ -214,7 +221,7 @@ class DBLoader2NPY(tf.keras.utils.Sequence):
             recovered_np_array.append(f)
         return np.array(recovered_np_array)
 
-    def __load_sample_by_pos(self, pos, clean_nan=True):
+    def __load_sample_by_pos(self, pos, clean_nan=True) -> (pd.DataFrame, np.array):
         """
 
         Parameters
@@ -239,6 +246,7 @@ class DBLoader2NPY(tf.keras.utils.Sequence):
                 sample = sample.applymap(self.parse_npy_vec_str)
 
             self.samples_memory[pos] = sample
+
         elif self.samples_memory is not None and self.maintain_memory:
             sample = self.samples_memory[pos]
         else:
@@ -271,7 +279,7 @@ class DBLoader2NPY(tf.keras.utils.Sequence):
 
             if amount_absent_frames > 0:
 
-                na_rep = self.const_none_angle_rep if self.angle_or_xy \
+                na_rep = self.const_none_angle_rep if self.angle_pose \
                     else self.const_none_xy_rep
 
                 empty_df = pd.DataFrame({
@@ -281,6 +289,37 @@ class DBLoader2NPY(tf.keras.utils.Sequence):
 
                 self.samples_memory[it] = sample.append(empty_df,
                                                         ignore_index=True)
+
+    @staticmethod
+    def __stack_xy_pose_2_npy(sample: pd.DataFrame):
+        """
+        Enfileira os valores de uma amostra de pose-XY em um formato numpy. Descartando o atributo relacionado aos
+        quadros (frames).
+
+        O formato de cada amostra, das Poses-XY, não converte diretamente para um np.array, pois para cada célula o
+        dataframe é tratado como um objeto separado e a coerção converte elas para um np.array de objetos. Logo Para
+        cada objeto ser tratado como parte do np.array final é necessario enfileirar cada um deles, de modo que,
+        existem 61 juntas por amostra, uma quantidade X de frames por amostra, com a amostra com maior numero de frames
+        pussindo 2860, logo, cada amostra deve ter um formato (shape) igual a (numero de frames, numero de juntas, 2).
+
+
+        Parameters
+        ----------
+        sample: pd.DataFrame
+
+        Returns
+        -------
+        np.array
+            a amostra convertida para np.array
+        """
+        sample_in_npy = []
+        for row in sample.iterrows():
+            row = row[1]
+            sample_in_npy.append(np.stack(row.values[1:], axis=0))
+
+        sample_in_npy = np.stack(sample_in_npy, axis=0)
+
+        return np.stack(sample_in_npy, axis=0)
 
     def batch_load_samples(self, samples_idxs, as_npy=True, clean_nan=True, pbar: tqdm = None):
         """
@@ -311,8 +350,18 @@ class DBLoader2NPY(tf.keras.utils.Sequence):
         Y = []
         for idx in samples_idxs:
             x, y = self.__load_sample_by_pos(idx, clean_nan=clean_nan)
+            if not self.angle_pose:
+                x = x.applymap(lambda c: c[:2] if type(c) is np.ndarray else c)
 
-            X.append(x.values if as_npy else x)
+                if self.samples_memory_xy_npy[idx] is None and as_npy:
+                    x = self.__stack_xy_pose_2_npy(x)
+                    self.samples_memory_xy_npy[idx] = x
+                elif self.samples_memory_xy_npy[idx] is not None and as_npy:
+                    x = self.samples_memory_xy_npy[idx]
+
+                X.append(x)
+            else:
+                X.append(x.values if as_npy else x)
             Y.append(y)
 
             if pbar is not None:
@@ -320,15 +369,18 @@ class DBLoader2NPY(tf.keras.utils.Sequence):
                 pbar.refresh()
 
         if as_npy:
+            shape_before = Y[0].shape
+            Y = np.concatenate(Y).reshape(len(samples_idxs), shape_before[0], shape_before[1])
+
+        if as_npy and self.angle_pose:
             shape_before = X[0].shape
             new_shape = [len(samples_idxs)]
             new_shape.extend(list(shape_before))
             new_shape = tuple(new_shape)
-            #print(shape_before, new_shape, [x.shape for x in X])
             X = np.concatenate(X).reshape(new_shape)
 
-            shape_before = Y[0].shape
-            Y = np.concatenate(Y).reshape(len(samples_idxs), shape_before[0], shape_before[1])
+
+
 
         return X, Y
 
