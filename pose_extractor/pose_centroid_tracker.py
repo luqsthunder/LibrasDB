@@ -114,11 +114,9 @@ class PoseCentroidTracker:
         for person_sub_id, alone_talk in persons_alone.items():
             person_sub_id = int(person_sub_id)
 
-            video.set(cv.CAP_PROP_POS_FRAMES, alone_talk['beg'])
+            video.set(cv.CAP_PROP_POS_MSEC, alone_talk['beg'])
             end_pos = alone_talk['end']
-            fps = video.get(cv.CAP_PROP_FPS)
-            end_pos = int(alone_talk['beg'] + fps * 5) + 1 \
-                if end_pos > int(alone_talk['beg'] + fps * 5) + 1 else end_pos
+            end_pos = alone_talk['beg'] + 5 if end_pos > int(alone_talk['beg'] + 5) + 1 else end_pos
 
             persons_centroids = [[], []]
             pose_df_cols = ['person', 'frame']
@@ -129,9 +127,10 @@ class PoseCentroidTracker:
             pose_df = pd.DataFrame(columns=pose_df_cols)
 
             if pbar is not None:
-                pbar.reset(total=int(end_pos - alone_talk['beg']))
+                pbar.reset(total=end_pos - alone_talk['beg'])
 
-            for _ in range(int(end_pos - alone_talk['beg'])):
+            last_msec = video.get(cv.CAP_PROP_POS_MSEC)
+            while video.get(cv.CAP_PROP_POS_MSEC) <= end_pos:
 
                 ret, frame = video.read()
                 if not ret:
@@ -139,6 +138,8 @@ class PoseCentroidTracker:
                                        f'The video is: {folder_path}')
                 # plt.imshow(frame)
                 # plt.show()
+
+                curr_msec = video.get(cv.CAP_PROP_POS_MSEC)
 
                 dt = self.pose_extractor.extract_poses(frame)
 
@@ -171,8 +172,10 @@ class PoseCentroidTracker:
                                                 self.body_parts,
                                                 None)
                 if pbar is not None:
-                    pbar.update(1)
+                    pbar.update(curr_msec - last_msec)
                     pbar.refresh()
+
+                last_msec = curr_msec
 
             print(persons_centroids)
             persons_body_centroid = [persons_centroids[0][0], persons_centroids[1][0]]

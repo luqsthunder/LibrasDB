@@ -10,9 +10,8 @@ import cv2 as cv
 import pandas as pd
 
 def process_single_sample(extractor, curr_video, beg, end, person_needed,
-                          left_person, first_x_mid):
-    curr_video.set(cv.CAP_PROP_POS_FRAMES, beg)
-    curr_frame = int(curr_video.get(cv.CAP_PROP_POS_FRAMES))
+                          left_person, first_x_mid, pbar=None):
+    curr_video.set(cv.CAP_PROP_POS_MSEC, beg)
     in_need_id = 0 if person_needed == left_person else 1
     df_cols = ['frame'] + pose_tracker.body_parts + \
               ['l-' + x for x in pose_tracker.hands_parts] + \
@@ -20,12 +19,18 @@ def process_single_sample(extractor, curr_video, beg, end, person_needed,
 
     video_df = pd.DataFrame(columns=df_cols)
     debug_centroids = []
-    for _ in tqdm(range(end - beg)):
+
+    if pbar is not None:
+        pbar.reset(total=end-beg)
+
+    last_msec = curr_video.get(cv.CAP_PROP_POS_MSEC)
+    while curr_video.get(cv.CAP_PROP_POS_MSEC) <= end:
         ret, frame = curr_video.read()
         if not ret:
             return None
         dt = extractor.extract_poses(frame)
 
+        curr_msec = curr_video.get(cv.CAP_PROP_POS_MSEC)
         curr_frame = int(curr_video.get(cv.CAP_PROP_POS_FRAMES))
         persons_id = pose_tracker.filter_persons_by_x_mid(dt, first_x_mid)
         # pose_to_centroid = dt.poseKeypoints[persons_id[in_need_id][0]]
@@ -38,6 +43,11 @@ def process_single_sample(extractor, curr_video, beg, end, person_needed,
                                                    persons_id[in_need_id][1],
                                                    pose_tracker.body_parts,
                                                    pose_tracker.hands_parts)
+        if pbar is not None:
+            pbar.update(curr_msec - last_msec)
+            pbar.refresh()
+
+        last_msec = curr_msec
 
     # mean_x_cent = 0
     # for x in debug_centroids:

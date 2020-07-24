@@ -111,7 +111,9 @@ def data_generator(batchsize, db, amount_epochs, mode='train', random=False,
         #print('finished epoch')
 
 try:
-    net.fit(x=data_generator(batch_size, db, epochs), epochs=epochs, verbose=2,
-            steps_per_epoch=db.db_length() // batch_size)
+    # net.fit(x=data_generator(batch_size, db, epochs), epochs=epochs, verbose=2,
+    #         steps_per_epoch=(db.db_length() // batch_size) + 1)
+    net.fit(x=db, epochs=epochs, verbose=2,
+            steps_per_epoch=(db.db_length() // batch_size) + 1)
 except BaseException as e:
     print(e)
