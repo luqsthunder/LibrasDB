@@ -398,8 +398,9 @@ class AllEAFParser2CSV:
                         else:
                             good_videos.append(v)
                             vid.release()
-                            
-                    if not any(list(map(lambda x: '1.mp4' in x, good_videos))):
+
+                    good_videos = list(filter(lambda x: '1.mp4' in x, good_videos))
+                    if len(good_videos) == 0:
                         yield [], [], '', '', ''
                         continue
 
