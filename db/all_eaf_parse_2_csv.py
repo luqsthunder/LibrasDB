@@ -78,39 +78,8 @@ class AllEAFParser2CSV:
         res = [f.result() for f in futures]
         return res
 
-
     def __process_async_dupls(self, libras_df, beg_rng, end_rng):
         pass
-
-    def __process_dupls_batch(self, libras_df, beg_rng, end_rng):
-        """
-
-        Parameters
-        ----------
-
-
-        Returns
-        -------
-
-        """
-
-        row_2_drop = []
-        hands_in_rows = []
-        for it, row in enumerate(libras_df.iterrows()[beg_rng:end_rng]):
-            row = row[1]
-            res = libras_df.loc[(libras_df['beg'] == row['beg']) &
-                                (libras_df['end'] == row['end']) &
-                                (libras_df['talker_id'] == row['talker_id']) &
-                                (libras_df['folder_name'] == row['folder_name']) &
-                                (libras_df['sign'] == row['sign'])]
-            if res.shape[0] > 1:
-                # libras_df.loc[it, 'hand'] = 2
-                row_2_drop.append(res.index)
-                hands_in_rows.append(dict(row=res.index, hands=2))
-            else:
-                hands_in_rows.append(dict(row=res.index, hands=1))
-
-        return row_2_drop, hands_in_rows
 
     def process(self, pbar=None, pbar_dup=None, path_to_save_sign_df='./'):
         """
@@ -322,7 +291,6 @@ class AllEAFParser2CSV:
                                  ignore_index=True)
         return signs
 
-
     @staticmethod
     def __get_parsed_timestamps(tree):
         """
@@ -427,10 +395,6 @@ class AllEAFParser2CSV:
                     if failed_video[0]:
                         yield [], []
                         continue
-
-                    # if len(good_videos) == 0 or len(subs_parsed) == 0:
-                    #     yield [], []
-                    #     continue
 
                     yield subs_parsed, good_videos
 
