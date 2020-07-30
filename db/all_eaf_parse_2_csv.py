@@ -7,6 +7,7 @@ from copy import copy
 import cv2 as cv
 from concurrent.futures import ThreadPoolExecutor
 import multiprocessing
+from copy import deepcopy
 
 
 class AllEAFParser2CSV:
@@ -78,9 +79,6 @@ class AllEAFParser2CSV:
         res = [f.result() for f in futures]
         return res
 
-    def __process_async_dupls(self, libras_df, beg_rng, end_rng):
-        pass
-
     def process(self, pbar=None, pbar_dup=None, path_to_save_sign_df='./'):
         """
         Funcao principal que processa todas as legendas.
@@ -95,6 +93,9 @@ class AllEAFParser2CSV:
             Barra de progresso para o processamento dos sinais em duplicatas.
             Caso None o a função cria uma própria pbar.
 
+        path_to_save_sign_df: str
+            Localidade onde deve ser salvo o dataframe/csv que organiza a base de dados.
+
         """
         gen_subs = self.__gen_xmls_base_subs()
         amount_folders = self.amount_items()
@@ -105,7 +106,7 @@ class AllEAFParser2CSV:
             if pbar is None else pbar
 
         amount_dups = 0
-        for subs_xml, videos in gen_subs:
+        for subs_xml, videos, estate_name, proj_name, folder_path in gen_subs:
 
             if len(subs_xml) == 0 or len(videos) == 0:
                 pbar.update(1)
@@ -143,7 +144,7 @@ class AllEAFParser2CSV:
 
             # iterrows retorna uma tupla com (idx: int, row: pd.Series)
             libras_df = self.__update_sign_df(libras_df, subs[0], time_stamps[0],
-                                              videos[0])
+                                              videos[0], estate_name, proj_name, folder_path)
             pbar.update(1)
             pbar.refresh()
 
@@ -184,8 +185,8 @@ class AllEAFParser2CSV:
         libras_df.to_csv(path_2_all_videos)
 
     @staticmethod
-    def __update_sign_df(df: pd.DataFrame, subs: pd.DataFrame,
-                         time_stamps: dict, video: str):
+    def __update_sign_df(df: pd.DataFrame, subs: pd.DataFrame, time_stamps: dict, video: str, estate_name: str,
+                         proj_name: str, folder_path: str):
         """
         Atualiza o dat;,aframe com as seguintes colunas:
         sinais: str nome do sinal;
@@ -229,9 +230,12 @@ class AllEAFParser2CSV:
         talker_id = [x[1]['talker_id'] for x in subs.iterrows()]
         hand = [x[1]['hand'] for x in subs.iterrows()]
         video = [video] * len(signs)
+        proj = [proj_name] * len(signs)
+        folder = [folder_path] * len(signs)
+        estate = [estate_name] * len(signs)
 
-        data_dict = dict(sign=signs, beg=begs, end=ends, folder_name=video,
-                         talker_id=talker_id, hand=hand)
+        data_dict = dict(sign=signs, beg=begs, end=ends, folder_name=video, talker_id=talker_id, hand=hand,
+                         project=proj, folder=folder, estate=estate)
 
         return df.append(pd.DataFrame(data=data_dict), ignore_index=True)
 
@@ -342,6 +346,7 @@ class AllEAFParser2CSV:
 
         for estates_path in self.estates_path_in_db:
             for proj_path in os.listdir(estates_path):
+                proj_name = deepcopy(proj_path)
                 proj_path = os.path.join(estates_path, proj_path)
 
                 proj_dirs = os.listdir(proj_path)
@@ -349,6 +354,7 @@ class AllEAFParser2CSV:
                                      proj_dirs))
 
                 for item_path in proj_dirs:
+                    item_name = deepcopy(item_path)
                     items_dir = os.listdir(item_path)
                     items_dir = \
                         list(map(lambda x: os.path.join(item_path, x),
@@ -366,12 +372,14 @@ class AllEAFParser2CSV:
                             self.bad_subs.append((s, item_path))
 
                     if failed_subs_count == len(subs):
-                        yield [], []
+                        yield [], [], '', ''
                         continue
 
-                    videos = list(filter(lambda x: '.mp4' in x, items_dir))
+                    videos = list(filter(lambda x: '1.mp4' in x, items_dir))
+                    has_new_video = any(list(map(lambda x: 'new' in x, videos)))
+
                     if len(videos) == 0:
-                        yield [], []
+                        yield [], [], '', '', ''
                         continue
 
                     failed_video = [False] * len(videos)
@@ -393,10 +401,14 @@ class AllEAFParser2CSV:
                             good_videos.append(v)
                             vid.release()
                     if failed_video[0]:
-                        yield [], []
+                        yield [], [], '', '', ''
                         continue
 
-                    yield subs_parsed, good_videos
+                    new_video_path = list(filter(lambda x: 'new' in x, videos))[0] if has_new_video else None
+                    if new_video_path is not None:
+                        good_videos = [new_video_path] + good_videos
+
+                    yield subs_parsed, good_videos, estates_path, proj_name, item_name
 
 
 if __name__ == '__main__':
