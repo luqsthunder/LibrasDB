@@ -129,14 +129,13 @@ class AllEAFParser2CSV:
                         has_subs_diff = True
 
                 if has_subs_diff:
-                    for it in range(len(subs)):
-                        dif_df = pd.DataFrame(columns=df_cols)
-                        name_df = f'v-({amount_dups})diff_df-it-{it}.csv'
-                        name_df = os.path.join(path_to_save_sign_df, name_df)
-                        self.__update_sign_df(dif_df, subs[it],
-                                              time_stamps[it],
-                                              videos[0]).to_csv(name_df)
-                        amount_dups += 1
+#                    for it in range(len(subs)):
+#                        dif_df = pd.DataFrame(columns=df_cols)
+#                        name_df = f'v-({amount_dups})diff_df-it-{it}.csv'
+#                        name_df = os.path.join(path_to_save_sign_df, name_df)
+#                        self.__update_sign_df(dif_df, subs[it], time_stamps[it], videos[0], 
+#                                              estate_name, proj_name, folder_path).to_csv(name_df)
+#                        amount_dups += 1
 
                     pbar.update(1)
                     pbar.refresh()
@@ -148,10 +147,10 @@ class AllEAFParser2CSV:
             pbar.update(1)
             pbar.refresh()
 
-        # # Nos arquivos EAF do Corpus de Libras cada falante quando executa um
-        # # sinal com ambas as mãos é colocado em duplicidade no EAF.
-        # # Nessa etapa abaixo removemos as duplicidades pois não é interessante
-        # # saber ja que vamos extrair o esqueleto posteriormente.
+        # Nos arquivos EAF do Corpus de Libras cada falante quando executa um
+        # sinal com ambas as mãos é colocado em duplicidade no EAF.
+        # Nessa etapa abaixo removemos as duplicidades pois não é interessante
+        # saber ja que vamos extrair o esqueleto posteriormente.
         row_2_drop = []
         path_2_dup_all_videos = os.path.join(path_to_save_sign_df,
                                              'dupl-all_videos.csv')
@@ -399,7 +398,8 @@ class AllEAFParser2CSV:
                         else:
                             good_videos.append(v)
                             vid.release()
-                    if failed_video[0]:
+                            
+                    if not any(list(map(lambda x: '1.mp4' in x, good_videos))):
                         yield [], [], '', '', ''
                         continue
 
