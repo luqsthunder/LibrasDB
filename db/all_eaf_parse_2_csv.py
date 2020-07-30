@@ -155,7 +155,7 @@ class AllEAFParser2CSV:
         row_2_drop = []
         path_2_dup_all_videos = os.path.join(path_to_save_sign_df,
                                              'dupl-all_videos.csv')
-        libras_df = pd.read_csv(path_to_save_sign_df)
+        libras_df = pd.read_csv(path_2_dup_all_videos)
         pbar_dup = tqdm(total=libras_df.shape[0], desc='dups') \
             if pbar_dup is None else pbar_dup
 
@@ -179,7 +179,6 @@ class AllEAFParser2CSV:
         single_list_drop = list(map(lambda x: x[1], row_2_drop))
         single_list_drop = list(set(single_list_drop))
         libras_df = libras_df.drop(single_list_drop)
-        
 
         path_2_all_videos = os.path.join(path_to_save_sign_df, 'all_videos.csv')
         libras_df.to_csv(path_2_all_videos)
