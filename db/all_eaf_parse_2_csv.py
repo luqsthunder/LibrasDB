@@ -371,7 +371,7 @@ class AllEAFParser2CSV:
                             self.bad_subs.append((s, item_path))
 
                     if failed_subs_count == len(subs):
-                        yield [], [], '', ''
+                        yield [], [], '', '', ' '
                         continue
 
                     videos = list(filter(lambda x: '1.mp4' in x, items_dir))
