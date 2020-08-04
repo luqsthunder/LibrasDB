@@ -26,7 +26,7 @@ class AllEAFParser2CSV:
                                               self.estates_path_in_db))
         self.bad_videos = []
         self.bad_subs = []
-        self.amount_workers = multiprocessing.cpu_count() * 4
+        self.amount_workers = multiprocessing.cpu_count()
         self.thread_executor = \
             ThreadPoolExecutor(max_workers=self.amount_workers)
 
@@ -154,7 +154,7 @@ class AllEAFParser2CSV:
         row_2_drop = []
         path_2_dup_all_videos = os.path.join(path_to_save_sign_df,
                                              'dupl-all_videos.csv')
-        libras_df = pd.read_csv(path_2_dup_all_videos)
+        libras_df.to_csv(path_2_dup_all_videos)
         pbar_dup = tqdm(total=libras_df.shape[0], desc='dups') \
             if pbar_dup is None else pbar_dup
 
@@ -380,7 +380,6 @@ class AllEAFParser2CSV:
                         yield [], [], '', '', ''
                         continue
 
-                    failed_video = [False] * len(videos)
                     good_videos = []
                     for it, v in enumerate(videos):
                         try:
@@ -412,7 +411,7 @@ class AllEAFParser2CSV:
 
 
 if __name__ == '__main__':
-    db_cut_videos = AllEAFParser2CSV('../LibrasCorpusScrapy/db')
-    db_cut_videos.process()
+    db_cut_videos = AllEAFParser2CSV('D:/gdrive/LibrasCorpus')
+    db_cut_videos.process(path_to_save_sign_df='./')
     print(db_cut_videos.bad_subs, file=open('bad_subs.txt', mode='w'))
     print(db_cut_videos.bad_videos, file=open('bad_videos.txt', mode='w'))

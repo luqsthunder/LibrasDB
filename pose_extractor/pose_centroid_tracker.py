@@ -68,7 +68,6 @@ class PoseCentroidTracker:
             recovered_np_array.append(f)
         return np.array(recovered_np_array)
 
-
     def retrive_persons_centroid_from_sign_df(self, folder_path, db_path,
                                               pbar=None):
         """
@@ -88,7 +87,7 @@ class PoseCentroidTracker:
             Barra de progresso a ser utilizado enquanto é extraido os centroids das
             pessoas presentes no video.
 
-        Raise
+        Raises
         -----
         RumtimeError:
             Caso o video termine inexperadamente.
