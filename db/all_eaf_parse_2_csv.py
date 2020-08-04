@@ -182,16 +182,29 @@ class AllEAFParser2CSV:
         path_2_all_videos = os.path.join(path_to_save_sign_df, 'all_videos.csv')
         libras_df.to_csv(path_2_all_videos)
 
+    def remove_db_df_path_specific(self, df):
+        """
+        
+        Parameters
+        ----------
+        df
+
+        Returns
+        -------
+
+        """
+        folder_count_to_db = len(self.estates_path_in_db[0].split('/')) - 1
+        db_df = pd.read_csv(df) if isinstance(df, str) else df
+        db_df['folder_path'] = db_df['folder_path'].applymap(lambda x: x.split('/')[folder_count_to_db:])
+        return db_df
+
     @staticmethod
     def __update_sign_df(df: pd.DataFrame, subs: pd.DataFrame, time_stamps: dict, video: str, estate_name: str,
                          proj_name: str, folder_path: str):
         """
         Atualiza o dat;,aframe com as seguintes colunas:
-        sinais: str nome do sinal;
-        beg: int (inicio em milisegundo do sinal no video de acordo com a
-        legenda);
-        end: int (final em milisegundo do sinal no video de acordo com a
-        legenda);
+        sinais: str nome do sinal; beg: int (inicio em milisegundo do sinal no video de acordo com a legenda);
+        end: int (final em milisegundo do sinal no video de acordo com a legenda);
         folder_name: str nome da pasta / video;
         talker_id: int ID da de quem sinaliza de acordo com a legenda;
         hand: int quantas mãos são utilizadas na execução do sinal.
