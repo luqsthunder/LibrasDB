@@ -154,7 +154,7 @@ class AllEAFParser2CSV:
         row_2_drop = []
         path_2_dup_all_videos = os.path.join(path_to_save_sign_df,
                                              'dupl-all_videos.csv')
-        libras_df.to_csv(path_2_dup_all_videos)
+        libras_df.to_csv(path_2_dup_all_videos, index=False)
         pbar_dup = tqdm(total=libras_df.shape[0], desc='dups') \
             if pbar_dup is None else pbar_dup
 
@@ -180,11 +180,11 @@ class AllEAFParser2CSV:
         libras_df = libras_df.drop(single_list_drop)
 
         path_2_all_videos = os.path.join(path_to_save_sign_df, 'all_videos.csv')
-        libras_df.to_csv(path_2_all_videos)
+        libras_df.to_csv(path_2_all_videos, index=False)
 
     def remove_db_df_path_specific(self, df):
         """
-        
+
         Parameters
         ----------
         df
