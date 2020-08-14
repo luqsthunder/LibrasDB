@@ -3,7 +3,6 @@ import pandas as pd
 import cv2 as cv
 import os
 from copy import copy
-from tqdm import tqdm
 from pose_extractor.all_parts import BODY_PARTS_NAMES, HAND_PARTS_NAMES
 from pose_extractor.openpose_extractor import DatumLike, OpenposeExtractor
 from pose_extractor.find_signaling_centroid import FindSignalingCentroid
@@ -52,7 +51,6 @@ class PoseCentroidTracker:
         if self.centroids_df is not None:
             self.centroids_df['centroid'] = \
                 self.centroids_df['centroid'].apply(self.parse_npy_vec_str)
-        print('end')
 
     @staticmethod
     def parse_npy_vec_str(str_array_like):
@@ -113,9 +111,17 @@ class PoseCentroidTracker:
         for person_sub_id, alone_talk in persons_alone.items():
             person_sub_id = int(person_sub_id)
 
-            video.set(cv.CAP_PROP_POS_MSEC, alone_talk['beg'])
+            # 1000 é 1 segundo em milisegundo, CAP_PROP_FPS retorna quantos FPS tem um video.
+            frame_time = 1000 / video.get(cv.CAP_PROP_FPS)
+            succ = video.set(cv.CAP_PROP_POS_FRAMES, float(alone_talk['beg'] / frame_time))
+            if not succ:
+                raise RuntimeError(f'Could not set video position. The video is: {folder_path}')
+
+            last_frame_pos = video.get(cv.CAP_PROP_POS_FRAMES)
             end_pos = alone_talk['end']
-            end_pos = alone_talk['beg'] + 5 if end_pos > int(alone_talk['beg'] + 5) + 1 else end_pos
+            five_frames_msec = alone_talk['beg'] + 30 * frame_time
+            end_pos = five_frames_msec if end_pos > int(five_frames_msec) else end_pos
+            end_pos /= frame_time
 
             persons_centroids = [[], []]
             pose_df_cols = ['person', 'frame']
@@ -126,10 +132,10 @@ class PoseCentroidTracker:
             pose_df = pd.DataFrame(columns=pose_df_cols)
 
             if pbar is not None:
-                pbar.reset(total=end_pos - alone_talk['beg'])
+                total_frames = end_pos - alone_talk['beg'] / frame_time
+                pbar.reset(total=total_frames + 1)
 
-            last_msec = video.get(cv.CAP_PROP_POS_MSEC)
-            while video.get(cv.CAP_PROP_POS_MSEC) <= end_pos:
+            while video.get(cv.CAP_PROP_POS_FRAMES) <= end_pos:
 
                 ret, frame = video.read()
                 if not ret:
@@ -138,11 +144,11 @@ class PoseCentroidTracker:
                 # plt.imshow(frame)
                 # plt.show()
 
-                curr_msec = video.get(cv.CAP_PROP_POS_MSEC)
+                curr_frame_pos = video.get(cv.CAP_PROP_POS_FRAMES)
 
                 dt = self.pose_extractor.extract_poses(frame)
-
-                curr_frame = int(video.get(cv.CAP_PROP_POS_FRAMES))
+                cv.imshow('frame', dt.cvOutputData)
+                cv.waitKey(1)
 
                 curr_centroids = list(map(self.make_xy_centroid,
                                           dt.poseKeypoints))
@@ -165,18 +171,17 @@ class PoseCentroidTracker:
                 # a ele o ID correto que será o da legenda.
 
                 for person_id in range(2):
-                    pose_df = update_xy_pose_df(dt, pose_df, curr_frame,
+                    pose_df = update_xy_pose_df(dt, pose_df, curr_frame_pos,
                                                 person_id,
                                                 persons_pos_id[person_id],
                                                 self.body_parts,
-                                                None)
+                                                self.hands_parts)
                 if pbar is not None:
-                    pbar.update(curr_msec - last_msec)
+                    pbar.update(curr_frame_pos - last_frame_pos)
                     pbar.refresh()
 
-                last_msec = curr_msec
+                last_frame_pos = curr_frame_pos
 
-            print(persons_centroids)
             persons_body_centroid = [persons_centroids[0][0], persons_centroids[1][0]]
             talking_person_id = \
                 self.person_2_sign.process_single_sample(pose_df)
@@ -191,13 +196,13 @@ class PoseCentroidTracker:
                 df_persons_centroid_video.append(curr_data, ignore_index=True)
 
             not_talking_person_id = 0 if talking_person_id == 1 else 1
-            print(not_talking_person_id, talking_person_id)
+            #print(not_talking_person_id, talking_person_id)
 
             not_talker_centroid = persons_body_centroid[not_talking_person_id]
             not_talker_sub_id = 1 if person_sub_id == 2 else 2
 
-            print(not_talker_sub_id, person_sub_id, person_sub_id == 2, 
-                  int(person_sub_id) == 2)
+            #print(not_talker_sub_id, person_sub_id, person_sub_id == 2,
+            #      int(person_sub_id) == 2)
 
             curr_data = pd.DataFrame(data=dict(folder=[folder_path],
                                                talker_id=[not_talker_sub_id],
@@ -229,8 +234,7 @@ class PoseCentroidTracker:
     def filter_persons_by_x_mid(self, dt, first_x_mid):
 
         if dt.poseKeypoints.size > 1:
-            curr_body_centroids = list(map(self.make_xy_centroid,
-                                           dt.poseKeypoints))
+            curr_body_centroids = list(map(self.make_xy_centroid, dt.poseKeypoints))
 
             x_mid_body = sum(map(lambda x: x[0], curr_body_centroids))
             x_mid_body = x_mid_body / len(curr_body_centroids)
@@ -251,8 +255,8 @@ class PoseCentroidTracker:
             curr_r_hands_centroids = list(map(self.make_xy_centroid,
                                               dt.poseKeypoints))
 
-            x_mid_hands = sum(map(lambda x: x[0], curr_body_centroids))
-            x_mid_hands = x_mid_hands / len(curr_body_centroids)
+            x_mid_hands = sum(map(lambda x: x[0], curr_r_hands_centroids))
+            x_mid_hands = x_mid_hands / len(curr_r_hands_centroids)
 
             if len(curr_r_hands_centroids) > 1:
                 left_person_r_hand_dt = 0 \

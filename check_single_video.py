@@ -25,7 +25,7 @@ if __name__ == '__main__':
     #args = parser.parse_args()
     
 
-    rm_bad = True
+    rm_bad = False
     if os.path.isdir(sys.argv[1]):
         bad_list = []
         for file in tqdm(os.listdir(sys.argv[1]), position=1):

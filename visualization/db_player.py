@@ -1,9 +1,12 @@
 import cv2
 import os
 import sys
-import pandas as pd
 import time
-from PyQt5.QtCore import QThread, Qt, pyqtSignal, pyqtSlot
+import pandas as pd
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
+from pose_extractor.pose_centroid_tracker import PoseCentroidTracker
+from PyQt5.QtCore import QThread, Qt, pyqtSignal, pyqtSlot, QMutex
 from PyQt5.QtGui import QImage, QPixmap
 from PyQt5.QtWidgets import QWidget, QLabel, QApplication, QPushButton, \
     QHBoxLayout, QVBoxLayout
@@ -64,7 +67,7 @@ class App(QWidget):
 
     def __init__(self, th_cls=OCVVideoThread, **th_cls_kwargs):
         super().__init__()
-        self.th_cls=th_cls
+        self.th_cls = th_cls
         self.th_cls_kwargs=th_cls_kwargs
         self.init_ui()
 
@@ -145,43 +148,55 @@ class ViewDBCutVideos(OCVVideoThread):
         self.all_samples_path_from_video = None
         self.curr_sample_idx = 0
         self.curr_sample_opts = None
+        self.mutex = QMutex()
         self.__update_videos_n_paths()
+        self.class_list = self.make_list_class_samples()
+        self.curr_sample_joints = None
+        self.curr_sample_angles = None
+
+    def make_list_class_samples(self):
+        cls = list(map(lambda x: (x[0], x[1].split('/')[-1]), enumerate(self.all_samples_path_from_video)))
+        return cls
 
     def read_cur_video(self):
+        ret, frame = None, None
+
         if self.cap is None:
             video_path = os.path.join(self.db_path, self.all_videos_path[self.curr_video_idx])
+            self.mutex.lock()
             self.cap = cv2.VideoCapture(video_path)
             self.curr_frame_time_sec = (1000 / self.cap.get(cv2.CAP_PROP_FPS)) / 1000
             self.curr_frame_time_ms = 1000 / self.cap.get(cv2.CAP_PROP_FPS)
+            self.mutex.unlock()
 
-            # pos 4: video name; pos 5: sinal;  pos 7: beg; pos 9: end + '.csv'
-            sample_name = \
-                self.all_samples_path_from_video[self.curr_sample_idx].replace('\\', '/').split('/')[-1].split('-')
-            self.curr_sample_opts = {'beg': float(sample_name[7]) - 500,
-                                     'end': float(sample_name[9].split('.')[0]) + 500,
-                                     'video_name': sample_name[5], 'sign': sample_name[4]}
-            succ = self.cap.set(cv2.CAP_PROP_POS_FRAMES, self.curr_sample_opts['beg'] // self.curr_frame_time_ms)
-            if not succ:
-                raise RuntimeError(f'Could not set frame pos {video_path}')
+            self.__reset_cap_position()
 
-        time.sleep(self.curr_frame_time_sec)
-        ret, frame = self.cap.read()
-        if self.cap.get(cv2.CAP_PROP_POS_FRAMES) >= (self.curr_sample_opts['end'] // self.curr_frame_time_ms):
-            self.cap.set(cv2.CAP_PROP_POS_FRAMES, self.curr_sample_opts['beg'] // self.curr_frame_time_ms)
+        else:
+            time.sleep(self.curr_frame_time_sec)
 
-        if not ret:
-            raise RuntimeError(f'bad video {self.all_videos_path[self.curr_video_idx]}')
+            self.mutex.lock()
+            ret, frame = self.cap.read()
+            if self.cap.get(cv2.CAP_PROP_POS_FRAMES) >= (self.curr_sample_opts['end'] // self.curr_frame_time_ms):
+                self.cap.set(cv2.CAP_PROP_POS_FRAMES, self.curr_sample_opts['beg'] // self.curr_frame_time_ms)
+            self.mutex.unlock()
 
-        self.__write_info_2_im(frame)
+            if not ret:
+                raise RuntimeError(f'bad video {self.all_videos_path[self.curr_video_idx]}')
+
+            self.__write_joints_2_im(frame)
+            self.__write_info_2_im(frame)
+
         return ret, frame
 
     def prev_sample(self):
         self.curr_sample_idx = self.curr_sample_idx - 1 if self.curr_sample_idx != 0 \
                                                         else len(self.all_samples_path_from_video)
+        self.__reset_cap_position()
 
     def next_sample(self):
         self.curr_sample_idx = self.curr_sample_idx + 1 \
             if self.curr_sample_idx < len(self.all_samples_path_from_video) - 1 else 0
+        self.__reset_cap_position()
 
     def prev_vid(self):
         self.curr_video_idx = self.curr_video_idx - 1 if self.curr_video_idx != 0 else len(self.all_videos_path) - 1
@@ -191,6 +206,25 @@ class ViewDBCutVideos(OCVVideoThread):
         self.curr_video_idx = self.curr_video_idx + 1 if self.curr_video_idx < len(self.all_videos_path) - 1 else 0
         self.__update_videos_n_paths()
 
+    def __reset_cap_position(self):
+        video_path = os.path.join(self.db_path, self.all_videos_path[self.curr_video_idx])
+        # pos 4: video name; pos 5: sinal;  pos 7: beg; pos 9: end + '.csv'
+        sample_name = \
+            self.all_samples_path_from_video[self.curr_sample_idx].replace('\\', '/').split('/')[-1].split('-')
+        sample_csv_path = os.path.join(self.db_path,
+                                       *(self.all_videos_path[self.curr_video_idx].replace('\\', '/').split('/')[:-1]),
+                                       self.all_samples_path_from_video[self.curr_sample_idx])
+        self.curr_sample_joints = pd.read_csv(sample_csv_path)
+        self.curr_sample_joints = self.curr_sample_joints.applymap(PoseCentroidTracker.parse_npy_vec_str)
+        self.curr_sample_opts = {'beg': float(sample_name[7]),
+                                 'end': float(sample_name[9].split('.')[0]),
+                                 'video_name': sample_name[5], 'sign': sample_name[4]}
+        if self.mutex.tryLock():
+            succ = self.cap.set(cv2.CAP_PROP_POS_FRAMES, self.curr_sample_opts['beg'] // self.curr_frame_time_ms)
+            self.mutex.unlock()
+            if not succ:
+                raise RuntimeError(f'Could not set frame pos {video_path}')
+
     def __update_videos_n_paths(self):
         path_end_in_folder = self.all_videos_path[self.curr_video_idx].replace('\\', '/').split('/')[:-1]
         path_end_in_folder = os.path.join(*path_end_in_folder)
@@ -199,16 +233,16 @@ class ViewDBCutVideos(OCVVideoThread):
         if self.cap is not None:
             self.cap.release()
 
-
     @staticmethod
     def __convert_msec_2_hour_text(ms):
         ms = int(ms)
         seconds = (ms / 1000) % 60
+        milisec = (seconds % 1) * 1000
         seconds = int(seconds)
-        minutes = (ms/ (1000 * 60)) % 60
+        minutes = (ms / (1000 * 60)) % 60
         minutes = int(minutes)
         hours = (ms / (1000 * 60 * 60)) % 24
-        return '%d: %d: %d' % (hours, minutes, seconds)
+        return '%d: %d: %d: %d' % (hours, minutes, seconds, milisec)
 
     def __write_info_2_im(self, im):
         font = cv2.FONT_HERSHEY_SIMPLEX
@@ -226,11 +260,21 @@ class ViewDBCutVideos(OCVVideoThread):
                         font_color,
                         line_type)
 
+    def __write_joints_2_im(self, im, radius=2, color=(255, 0, 255)):
+        frame_pos = int(self.cap.get(cv2.CAP_PROP_POS_FRAMES))
+        frame_search_res = self.curr_sample_joints.frame == frame_pos
+        if not any(frame_search_res.values):
+            return
+
+        joints_at_frame = self.curr_sample_joints[frame_search_res].values[0][2:]
+        for joint in joints_at_frame:
+            cv2.circle(im, tuple(map(int, joint[:2])), radius, color, 1)
+
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
 
-    w = App(th_cls=ViewDBCutVideos, all_videos_df_path='all_videos.csv',db_path='D:/gdrive/LibrasCorpus')
+    w = App(th_cls=ViewDBCutVideos, all_videos_df_path='all_videos.csv', db_path='D:/gdrive/LibrasCorpus')
     w.show()
 
     sys.exit(app.exec_())

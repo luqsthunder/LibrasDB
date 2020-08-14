@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 import tensorflow as tf
 from tqdm.auto import tqdm
+from pose_extractor.all_parts import *
 import sklearn as sk
 
 
@@ -17,8 +18,8 @@ class DBLoader2NPY(tf.keras.utils.Sequence):
 
     def __init__(self, db_path, batch_size, angle_pose=True, no_hands=True,
                  maintain_memory=True, make_k_fold=False, k_fold_amount=None,
-                 const_none_angle_rep=-9999,
-                 const_none_xy_rep=np.array([-9999, -9999, -9999])):
+                 const_none_angle_rep=0,
+                 const_none_xy_rep=np.array([0, 0, 0])):
         """
         Parameters
         ----------
@@ -348,8 +349,12 @@ class DBLoader2NPY(tf.keras.utils.Sequence):
             pbar.set_description('loading samples')
         X = []
         Y = []
+        joints_used = [1, 2, 3, 4, 5, 6, 7]
+        joints_used = ['frame'] + [INV_BODY_PARTS[x] for x in joints_used]
         for idx in samples_idxs:
             x, y = self.__load_sample_by_pos(idx, clean_nan=clean_nan)
+            if not self.angle_pose:
+                x = x[joints_used]
             if not self.angle_pose:
                 x = x.applymap(lambda c: c[:2] if type(c) is np.ndarray else c)
 
@@ -394,7 +399,7 @@ class DBLoader2NPY(tf.keras.utils.Sequence):
         x, y = self.batch_load_samples(list(range(beg, end)))
 
         # the first coordinate of features is frame and we not need it.
-        x = x[:, :, 1:]
+        #x = x[:, :, 1:]
         #print(f'{index}: {beg}->{end} shape: {x.shape}, {y.shape}')
         return x, y, [None]
 

@@ -55,7 +55,8 @@ def convert_xypose_to_dir_angle(first_pose, second_pose, third_pose):
     return angle_sign * angle
 
 
-def make_angle_df_from_xy(sample: pd.DataFrame, no_hands=False, pbar: tqdm = None, sample_name: str = None):
+def make_angle_df_from_xy(sample: pd.DataFrame, no_hands=False, pbar: tqdm = None, sample_name: str = None,
+                          body_angles=None, hand_angles=None):
     """
     Convert a XY-pose pd.DataFrame to a angle-pose pd.DataFrame.
 
@@ -110,13 +111,14 @@ def make_angle_df_from_xy(sample: pd.DataFrame, no_hands=False, pbar: tqdm = Non
         row = row[1]
         angle_data = {}
         angle_data.update({'frame': [row.frame]})
-        for angle_part in BODY_ANGLE_PAIRS:
-            angle_part_name = '-'.join(angle_part)
-            angle_pose = make_angle_pose(row, angle_part)
+        if body_angles is not None:
+            for angle_part in body_angles:
+                angle_part_name = '-'.join(angle_part)
+                angle_pose = make_angle_pose(row, angle_part)
 
-            angle_data.update({angle_part_name: [angle_pose]})
-        if not no_hands:
-            for angle_part in HAND_ANGLE_PAIRS:
+                angle_data.update({angle_part_name: [angle_pose]})
+        if not no_hands and hand_angles is not None:
+            for angle_part in hand_angles:
                 left_hand_angle_part = ['l-' + x for x in angle_part]
                 right_hand_angle_part = ['r-' + x for x in angle_part]
 
@@ -161,6 +163,10 @@ def convert_all_samples_xy_2_angle(db_path, no_hands=False):
     folder_pbar = tqdm(position=1)
     folder_pbar.reset(total=amount_samples)
 
+    body_angle_pairs_to_7 = [[1, 2, 3], [2, 3, 4], [1, 5, 6], [5, 6, 7], [2, 1, 5]]
+    body_angle_pairs_to_7 = [[INV_BODY_PARTS[x[0]], INV_BODY_PARTS[x[1]], INV_BODY_PARTS[x[2]]]
+                             for x in body_angle_pairs_to_7]
+
     for sample_xy, class_name, sample_name in yield_all_db_samples(db_path, no_hands):
         sample_path = os.path.join(db_path, class_name, dir_before_samples_name, sample_name)
 
@@ -171,7 +177,13 @@ def convert_all_samples_xy_2_angle(db_path, no_hands=False):
 
         folder_pbar.set_description(class_name)
 
-        sample_angle_df = make_angle_df_from_xy(sample_xy, no_hands, pbar=sample_pbar, sample_name=sample_name)
+        signs_info = sample_name.split('-')
+        folder_name = signs_info[3] + signs_info[4] if 'Inventário Nacional de Libras' in sample_name else signs_info[3]
+        only_sample_name = f'sample-angle-{signs_info[2]}-{folder_name}-{signs_info[5]}-beg-{signs_info[7]}-end-' \
+                           f'{signs_info[9]}'
+        sample_angle_df = make_angle_df_from_xy(sample_xy, True, pbar=sample_pbar, sample_name=only_sample_name,
+                                                body_angles=body_angle_pairs_to_7)
+
         sample_angle_df.to_csv(sample_path)
 
         folder_pbar.update(1)

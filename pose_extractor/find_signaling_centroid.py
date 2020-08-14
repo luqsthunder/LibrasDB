@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+from tqdm import tqdm
 
 
 class FindSignalingCentroid:
@@ -97,8 +98,6 @@ class FindSignalingCentroid:
                 last = frame_pos
 
         return persons_alone
-
-
 
     @staticmethod
     def __make_centroid_from_sing(self):

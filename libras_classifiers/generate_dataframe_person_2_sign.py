@@ -1,5 +1,7 @@
 from libras_classifiers.librasdb_loaders import DBLoader2NPY
 import numpy as np
+import matplotlib.pyplot as plt
+import math
 
 
 class DataframePerson2Sign:
@@ -52,25 +54,23 @@ class DataframePerson2Sign:
         for p_id in persons_id_in_video:
             person_joints = \
                 all_frames_in_window[all_frames_in_window['person'] == p_id]
+
             for it in range(beg + 1, end):
                 frame1 = person_joints[person_joints['frame'] == it]
                 frame0 = person_joints[person_joints['frame'] == (it - 1)]
 
                 frame1 = frame1.values[0, 2:]
                 frame0 = frame0.values[0, 2:]
+
                 dist = frame1 - frame0
-                dist = np.array(list(filter(
-                    lambda x: not isinstance(x, float), dist)))
+                dist = np.array(list(filter(lambda x: not isinstance(x, float), dist)))
                 dist = dist ** 2
                 dist = np.sum(np.array([np.sum(x) for x in dist]))
-                #print(f'sum after pow 2: \n {dist}\n')
                 dist = np.sqrt(dist)
-                #print(f'sqrt: \n {dist}\n')
                 dist = np.sum(dist)
-                #print(f'sum final: \n {dist}\n')
                 person_all_joints_dist[p_id] += dist
 
-        print('all_persons_joint', person_all_joints_dist)
+        # print('all_persons_joint', person_all_joints_dist)
         return np.argmax(np.array(person_all_joints_dist))
 
     def __make_derivate_around_a_frame(self, sample, beg, mid, end):
@@ -95,8 +95,8 @@ class DataframePerson2Sign:
 
         beg_frame_video = int(sample.frame.iloc[0])
         end_frame_video = int(sample.frame.iloc[-1])
-        print(f'beg_frame : {beg_frame_video}, end_frame: {end_frame_video}\n'\
-               '{sample}')
+        #print(f'beg_frame : {beg_frame_video}, end_frame: {end_frame_video}\n'\
+        #      f'{sample}')
 
         window_beg = self.video_window[0] if self.video_window[0] != -1 \
             else (end_frame_video - beg_frame_video) // 2
@@ -119,8 +119,8 @@ class DataframePerson2Sign:
                 if mid_curr_window + window_end <= end_frame_video \
                 else end_frame_video
 
-            print('process single sample', beg_curr_window, mid_curr_window,
-                  end_curr_window)
+            #print('process single sample', beg_curr_window, mid_curr_window,
+            #      end_curr_window)
             for method_name in res:
                 talker_id = self.__method_map[method_name](sample,
                                                            beg_curr_window,
