@@ -33,6 +33,8 @@ for f_name in csv_files_path:
     cls_name = f_name.split('-')[split_idx]
     f_name_path = os.path.join(src_csv_dir, f_name)
     f_name_dest = os.path.join(dest_dir, cls_name, 'hands-xy', f_name)
+    if os.path.exists(f_name_dest):
+        continue
     copyfile(f_name_path, f_name_dest)
     #print()
 print(count_classes)

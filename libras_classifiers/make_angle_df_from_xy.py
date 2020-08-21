@@ -166,6 +166,9 @@ def convert_all_samples_xy_2_angle(db_path, no_hands=False):
     body_angle_pairs_to_7 = [[1, 2, 3], [2, 3, 4], [1, 5, 6], [5, 6, 7], [2, 1, 5]]
     body_angle_pairs_to_7 = [[INV_BODY_PARTS[x[0]], INV_BODY_PARTS[x[1]], INV_BODY_PARTS[x[2]]]
                              for x in body_angle_pairs_to_7]
+    hand_angle_pair = [[0, 2, 4], [0, 6, 8], [0, 10, 12], [0, 14, 16], [0, 18, 20]]
+    hand_angle_pair = [[INV_HAND_PARTS[x[0]], INV_HAND_PARTS[x[1]], INV_HAND_PARTS[x[2]]]
+                       for x in hand_angle_pair]
 
     for sample_xy, class_name, sample_name in yield_all_db_samples(db_path, no_hands):
         sample_path = os.path.join(db_path, class_name, dir_before_samples_name, sample_name)
@@ -181,8 +184,8 @@ def convert_all_samples_xy_2_angle(db_path, no_hands=False):
         folder_name = signs_info[3] + signs_info[4] if 'Inventário Nacional de Libras' in sample_name else signs_info[3]
         only_sample_name = f'sample-angle-{signs_info[2]}-{folder_name}-{signs_info[5]}-beg-{signs_info[7]}-end-' \
                            f'{signs_info[9]}'
-        sample_angle_df = make_angle_df_from_xy(sample_xy, True, pbar=sample_pbar, sample_name=only_sample_name,
-                                                body_angles=body_angle_pairs_to_7)
+        sample_angle_df = make_angle_df_from_xy(sample_xy, False, pbar=sample_pbar, sample_name=only_sample_name,
+                                                body_angles=body_angle_pairs_to_7, hand_angles=hand_angle_pair)
 
         sample_angle_df.to_csv(sample_path)
 

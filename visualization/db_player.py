@@ -2,8 +2,10 @@ import cv2
 import os
 import sys
 import time
+import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+from matplotlib.figure import Figure
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 from pose_extractor.pose_centroid_tracker import PoseCentroidTracker
 from PyQt5.QtCore import QThread, Qt, pyqtSignal, pyqtSlot, QMutex
@@ -48,7 +50,7 @@ class OCVVideoThread(QThread):
                 bytesPerLine = ch * w
                 convertToQtFormat = QImage(rgbImage.data, w, h, bytesPerLine,
                                            QImage.Format_RGB888)
-                p = convertToQtFormat.scaled(640, 480, Qt.KeepAspectRatio)
+                p = convertToQtFormat.scaled(1920, 1080, Qt.KeepAspectRatio)
                 self.changePixmap.emit(p)
 
 
@@ -104,7 +106,7 @@ class App(QWidget):
         # self.resize(1366, 768)
         # create a label
         self.label = QLabel(self)
-        self.label.resize(1366, 768)
+        self.label.resize(1920, 1080)
 
         self.th = self.th_cls(**self.th_cls_kwargs)
 
@@ -136,7 +138,7 @@ class App(QWidget):
 
 class ViewDBCutVideos(OCVVideoThread):
 
-    def __init__(self, all_videos_df_path, db_path):
+    def __init__(self, all_videos_df_path, db_path, angle_db):
         super().__init__()
         self.all_videos = pd.read_csv(all_videos_df_path)
         self.all_videos_path = sorted(list(self.all_videos.folder_name.unique()))
@@ -148,6 +150,7 @@ class ViewDBCutVideos(OCVVideoThread):
         self.all_samples_path_from_video = None
         self.curr_sample_idx = 0
         self.curr_sample_opts = None
+        self.angle_db = angle_db
         self.mutex = QMutex()
         self.__update_videos_n_paths()
         self.class_list = self.make_list_class_samples()
@@ -176,7 +179,8 @@ class ViewDBCutVideos(OCVVideoThread):
 
             self.mutex.lock()
             ret, frame = self.cap.read()
-            if self.cap.get(cv2.CAP_PROP_POS_FRAMES) >= (self.curr_sample_opts['end'] // self.curr_frame_time_ms):
+            curr_frame_pos = self.cap.get(cv2.CAP_PROP_POS_FRAMES)
+            if curr_frame_pos >= (self.curr_sample_opts['end'] // self.curr_frame_time_ms):
                 self.cap.set(cv2.CAP_PROP_POS_FRAMES, self.curr_sample_opts['beg'] // self.curr_frame_time_ms)
             self.mutex.unlock()
 
@@ -184,9 +188,21 @@ class ViewDBCutVideos(OCVVideoThread):
                 raise RuntimeError(f'bad video {self.all_videos_path[self.curr_video_idx]}')
 
             self.__write_joints_2_im(frame)
-            self.__write_info_2_im(frame)
+
+            frame = cv2.resize(frame, (1920, 1080))
+            self.__write_info_2_im(frame, font_scale=1)
+
+            frame_angle = self.__make_matplotlib_2_npy(curr_frame_pos)
+            frame = self.__hconcat_resize_min([frame, frame_angle])
 
         return ret, frame
+
+    @staticmethod
+    def __hconcat_resize_min(im_list, interpolation=cv2.INTER_CUBIC):
+        h_max = max(im.shape[0] for im in im_list)
+        im_list_resize = [cv2.resize(im, (int(im.shape[1] * h_max / im.shape[0]), h_max), interpolation=interpolation)
+                          for im in im_list]
+        return cv2.hconcat(im_list_resize)
 
     def prev_sample(self):
         self.curr_sample_idx = self.curr_sample_idx - 1 if self.curr_sample_idx != 0 \
@@ -208,6 +224,9 @@ class ViewDBCutVideos(OCVVideoThread):
 
     def __reset_cap_position(self):
         video_path = os.path.join(self.db_path, self.all_videos_path[self.curr_video_idx])
+
+        sample_name_non_split = \
+            self.all_samples_path_from_video[self.curr_sample_idx].replace('\\', '/').split('/')[-1]
         # pos 4: video name; pos 5: sinal;  pos 7: beg; pos 9: end + '.csv'
         sample_name = \
             self.all_samples_path_from_video[self.curr_sample_idx].replace('\\', '/').split('/')[-1].split('-')
@@ -218,7 +237,10 @@ class ViewDBCutVideos(OCVVideoThread):
         self.curr_sample_joints = self.curr_sample_joints.applymap(PoseCentroidTracker.parse_npy_vec_str)
         self.curr_sample_opts = {'beg': float(sample_name[7]),
                                  'end': float(sample_name[9].split('.')[0]),
-                                 'video_name': sample_name[5], 'sign': sample_name[4]}
+                                 'video_name': sample_name[5], 'sign': sample_name[5]}
+        cur_angle_df_path = os.path.join(self.angle_db, self.curr_sample_opts['sign'], 'hands-angle',
+                                         sample_name_non_split)
+        self.curr_sample_angles = pd.read_csv(cur_angle_df_path)
         if self.mutex.tryLock():
             succ = self.cap.set(cv2.CAP_PROP_POS_FRAMES, self.curr_sample_opts['beg'] // self.curr_frame_time_ms)
             self.mutex.unlock()
@@ -244,17 +266,16 @@ class ViewDBCutVideos(OCVVideoThread):
         hours = (ms / (1000 * 60 * 60)) % 24
         return '%d: %d: %d: %d' % (hours, minutes, seconds, milisec)
 
-    def __write_info_2_im(self, im):
+    def __write_info_2_im(self, im, font_scale=0.3):
         font = cv2.FONT_HERSHEY_SIMPLEX
         bottom_left_corner_of_text = (10, 200)
-        font_scale = 0.3
         font_color = (255, 255, 255)
-        line_type = 1
+        line_type = 2
 
         for it, opt in enumerate(self.curr_sample_opts.items()):
             text = str(opt[1]) if not isinstance(opt[1], float) else self.__convert_msec_2_hour_text(opt[1])
             cv2.putText(im, text,
-                        (bottom_left_corner_of_text[0], bottom_left_corner_of_text[1] + it * 10),
+                        (bottom_left_corner_of_text[0], bottom_left_corner_of_text[1] + it * 40),
                         font,
                         font_scale,
                         font_color,
@@ -270,11 +291,35 @@ class ViewDBCutVideos(OCVVideoThread):
         for joint in joints_at_frame:
             cv2.circle(im, tuple(map(int, joint[:2])), radius, color, 1)
 
+    def __make_matplotlib_2_npy(self, frame_pos, range_base=5):
+        fig = Figure()
+        canvas = FigureCanvas(fig)
+        ax = fig.gca()
+
+        first_frame = self.curr_sample_angles.frame.iloc[0]
+        beg = frame_pos - range_base if frame_pos - range_base > first_frame else first_frame
+        frame_pos = int(frame_pos)
+        beg = int(beg)
+        for key in self.curr_sample_angles.keys():
+            angle_data = self.curr_sample_angles[key].iloc[beg:frame_pos]
+            ax.plot([x + beg for x in range(len(angle_data))], angle_data)
+
+        canvas.draw()  # draw the canvas, cache the renderer
+
+        width, height = fig.get_size_inches() * fig.get_dpi()
+        image = np.frombuffer(fig.canvas.tostring_rgb(), dtype=np.uint8)
+        image = image.reshape(fig.canvas.get_width_height()[::-1] + (3,))
+        return image
+
+    def __render_all_matplotlib_frames(self):
+        pass
+
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
 
-    w = App(th_cls=ViewDBCutVideos, all_videos_df_path='all_videos.csv', db_path='D:/gdrive/LibrasCorpus')
+    w = App(th_cls=ViewDBCutVideos, all_videos_df_path='all_videos.csv', db_path='D:/gdrive/LibrasCorpus',
+            angle_db='../libras-db-folders')
     w.show()
 
     sys.exit(app.exec_())

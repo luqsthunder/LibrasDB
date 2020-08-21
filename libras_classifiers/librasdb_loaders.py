@@ -16,9 +16,8 @@ class DBLoader2NPY(tf.keras.utils.Sequence):
     Diferenciar representação das poses XY para ângulo.
     """
 
-    def __init__(self, db_path, batch_size, angle_pose=True, no_hands=True,
-                 maintain_memory=True, make_k_fold=False, k_fold_amount=None,
-                 const_none_angle_rep=0,
+    def __init__(self, db_path, batch_size, angle_pose=True, no_hands=True, joints_2_use=None,
+                 maintain_memory=True, make_k_fold=False, k_fold_amount=None, const_none_angle_rep=0,
                  const_none_xy_rep=np.array([0, 0, 0])):
         """
         Parameters
@@ -32,6 +31,9 @@ class DBLoader2NPY(tf.keras.utils.Sequence):
 
         no_hands : bool
             Caso exista pose das mãos.
+
+        joints_2_use: List or None
+            lista com nome das juntas a serem usadas. Caso none, todas as juntas seram usadas.
 
         maintain_memory : bool
             carregar todo dataset na memoria
@@ -54,6 +56,8 @@ class DBLoader2NPY(tf.keras.utils.Sequence):
         self.const_none_xy_rep = const_none_xy_rep
         self.angle_pose = angle_pose
         self.batch_size = batch_size
+        self.make_k_fold = make_k_fold; self.k_fold_amount = k_fold_amount
+        self.joints_2_use = joints_2_use
 
         angle_or_xy = 'angle' if angle_pose else 'xy'
         angle_or_xy = 'no_hands-' + angle_or_xy \
@@ -90,6 +94,15 @@ class DBLoader2NPY(tf.keras.utils.Sequence):
         self.longest_sample = None
         self.longest_sample = self.find_longest_sample()
         self.weight_2_samples = None
+
+        self.k_fold_iteration = 0
+        self.k_folder = None
+        if self.make_k_fold:
+            self.k_folder = sk.model_selection.KFold(n_splits=self.k_fold_amount)
+            self.X_train, self.X_test = self.k_fold_samples()
+
+    def k_fold_samples(self):
+        return next(self.k_folder.split(self.samples_memory))
 
     def find_longest_sample(self):
         """
@@ -144,7 +157,15 @@ class DBLoader2NPY(tf.keras.utils.Sequence):
         return len(self.samples_path)
 
     def joints_used(self):
-        joint_names = self.__load_sample_by_pos(0)[0].keys()
+        """
+        Mostra quais juntas estão sendo usadas.
+
+        Returns
+        -------
+        joint_names: List
+            Lista com nome das juntas utilizadas no carregador.
+        """
+        joint_names = self.__load_sample_by_pos(0)[0].keys() if self.joints_2_use is None else self.joints_2_use
         return joint_names
 
     def amount_classes(self):
@@ -349,12 +370,10 @@ class DBLoader2NPY(tf.keras.utils.Sequence):
             pbar.set_description('loading samples')
         X = []
         Y = []
-        joints_used = [1, 2, 3, 4, 5, 6, 7]
-        joints_used = ['frame'] + [INV_BODY_PARTS[x] for x in joints_used]
         for idx in samples_idxs:
             x, y = self.__load_sample_by_pos(idx, clean_nan=clean_nan)
-            if not self.angle_pose:
-                x = x[joints_used]
+            if not self.angle_pose and self.joints_2_use is not None:
+                x = x[self.joints_2_use]
             if not self.angle_pose:
                 x = x.applymap(lambda c: c[:2] if type(c) is np.ndarray else c)
 
@@ -383,9 +402,6 @@ class DBLoader2NPY(tf.keras.utils.Sequence):
             new_shape.extend(list(shape_before))
             new_shape = tuple(new_shape)
             X = np.concatenate(X).reshape(new_shape)
-
-
-
 
         return X, Y
 

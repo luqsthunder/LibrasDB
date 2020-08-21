@@ -1,7 +1,7 @@
 from pose_extractor.openpose_extractor import OpenposeExtractor
 from pose_extractor.pose_centroid_tracker import PoseCentroidTracker
 from pose_extractor.df_utils import update_xy_pose_df_single_person
-from tqdm.auto import tqdm
+from tqdm import tqdm
 import os
 import numpy as np
 import matplotlib.pyplot as plt
@@ -30,7 +30,7 @@ def process_single_sample(extractor, curr_video, beg, end, person_needed_id, pba
     real_id_if_sorted = person_needed_id - 1
 
     if pbar is not None:
-        pbar.reset(total=frame_end_pos - beg_frame_pos)
+        pbar.reset(total=int(frame_end_pos - beg_frame_pos) + 1)
 
     first_x_mid = None
     while curr_video.get(cv.CAP_PROP_POS_FRAMES) <= frame_end_pos:
@@ -138,7 +138,7 @@ for f_name in tqdm(folders):
     for it, sign in tqdm(enumerate(needed_sings_in_video.iterrows()),
                          total=needed_sings_in_video.shape[0], desc='signs'):
         sign = sign[1]
-        if processed_signs_count[sign.sign] >= 40:
+        if processed_signs_count[sign.sign] >= 120:
             continue
 
         sign_name = sign.sign
@@ -149,11 +149,9 @@ for f_name in tqdm(folders):
             continue
 
         print(f'\n beg sign {sign.sign}')
-        #beg = sign.beg - 500 if sign.beg - 500 > 0 else 0
         df = process_single_sample(pose_tracker.pose_extractor,
                                    video, sign.beg-ms_window, sign.end+ms_window,
                                    sign.talker_id, pbar=tqdm())
-        #print(df)
         if df is not None:
             df.to_csv(sample_path)
             processed_signs_count[sign.sign] += 1

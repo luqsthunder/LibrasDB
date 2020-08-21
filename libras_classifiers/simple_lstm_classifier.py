@@ -1,17 +1,30 @@
 from libras_classifiers.librasdb_loaders import DBLoader2NPY
-import pandas as pd
 import numpy as np
 import tensorflow as tf
-import matplotlib.pyplot as plt
-import seaborn as sns
-from sklearn.manifold import TSNE
-from tqdm.auto import tqdm
+import argparse
+
+class BaseClassifierCLI:
+
+    def __init__(self, arg_map=None):
+        self.parser = argparse.ArgumentParser()
+
+    def fit(self):
+        pass
+
+    def predict(self):
+        pass
+
+    def base_args_map(self):
+        pass
+
+class SimpleTFLSTMCLI:
+    pass
 
 batch_size = 8
-epochs = 10
+epochs = 20
 db = DBLoader2NPY('../libras-db-folders', batch_size=batch_size,
                   no_hands=True, angle_pose=True)
-#db.fill_samples_absent_frames_with_na()
+db.fill_samples_absent_frames_with_na()
 
 max_len_seq = db.find_longest_sample()
 amount_joints_used = 5#len(db.joints_used()) - 1
@@ -33,11 +46,12 @@ distributed_flatten = tf.keras.layers.TimeDistributed(tf.keras.layers.Flatten(),
 lstm_layer = \
     tf.keras.layers.LSTM(units=120, activation='tanh',
                          recurrent_activation='sigmoid',
-                         return_sequences=False,
+                         return_sequences=True,
+                         input_shape=(max_len_seq, amount_joints_used)
                          )
 
 lstm_layer2 = \
-    tf.keras.layers.LSTM(units=16, activation='tanh',
+    tf.keras.layers.LSTM(units=32, activation='tanh',
                          recurrent_activation='sigmoid',
                          return_sequences=False)
 
@@ -53,9 +67,9 @@ net = tf.keras.Sequential()
 #net.add(distributed_1d_pool1)
 #net.add(distributed_1d_conv2)
 #net.add(distributed_1d_pool2)
-net.add(distributed_flatten)
+#net.add(distributed_flatten)
 net.add(lstm_layer)
-#net.add(lstm_layer2)
+net.add(lstm_layer2)
 #net.add(lstm_layer3)
 net.add(tf.keras.layers.Dense(units=amount_classes, activation='softmax'))
 #net.build()
@@ -115,52 +129,25 @@ def data_generator(batchsize, db, amount_epochs, mode='train', random=False,
 class SaveBestAcc(tf.keras.callbacks.Callback):
     best_acc = 0
     best_model = None
+    model_path_name = None
+
+    def __init__(self, model_path='model.h5'):
+        super().__init__()
+        self.model_path_name = model_path
 
     def on_epoch_end(self, epoch, logs=None):
         if logs['accuracy'] > self.best_acc:
             self.best_acc = logs['accuracy']
-            self.model.save('model.h5')
+            self.model.save(self.model_path_name)
         print(logs)
 
 
-def plot_tsne_frames():
-    tsne = TSNE(n_components=2, random_state=0)
-    all_samples = db.batch_load_samples(samples_idxs=[x for x in range(db.db_length())])
-
-    all_x = []
-    all_y = []
-    for it, sample in enumerate(all_samples[0]):
-        for frame in sample:
-            all_x.append(frame[1:])
-            all_y.append(np.argmax(all_samples[1][it]))
-
-    res = tsne.fit_transform(all_x)
-
-    plt.figure(0, figsize=(21, 9), dpi=720//9)
-    df2 = pd.DataFrame(dict(tsne_2d_one=[x[0] for x in res], tsne_2d_two=[x[1] for x in res],
-                            cls=all_y))
-    sns.scatterplot(
-            x="tsne_2d_one", y="tsne_2d_two",
-            hue="cls",
-            palette=sns.color_palette("hls", 2),
-            data=df2,
-            legend="full",
-            alpha=1
-        )
-    plt.show()
-
-
 try:
-    plot_tsne_frames()
-    # save_best_acc = SaveBestAcc()
-    # model_file_name = '{epoch:02d}-.hdf5'
-    # net.fit(data_generator(batch_size, db, amount_epochs=epochs),
-    #         steps_per_epoch=db.db_length() // batch_size,
-    #         epochs=epochs,
-    #         callbacks=[save_best_acc])
-    # net = tf.keras.models.load_model('model.h5')
-    # res = net.predict(data_generator(1, db, amount_epochs=1, mode='test'), steps=80)
-    #
+    save_best_acc = SaveBestAcc()
+    net.fit(db, epochs=epochs, callbacks=[save_best_acc])
+    net = tf.keras.models.load_model('model.h5')
+    res = net.predict(data_generator(1, db, amount_epochs=1, mode='test'), steps=80)
+
     # class_map = {'1': 'nome', '2': 'nome2'}
     # for it, samples_item_path in enumerate(db.samples_path):
     #     if not np.argmax(res[it]) == samples_item_path[1]:
