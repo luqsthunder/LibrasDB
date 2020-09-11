@@ -413,10 +413,6 @@ class DBLoader2NPY(tf.keras.utils.Sequence):
             else self.db_length()
 
         x, y = self.batch_load_samples(list(range(beg, end)))
-
-        # the first coordinate of features is frame and we not need it.
-        #x = x[:, :, 1:]
-        #print(f'{index}: {beg}->{end} shape: {x.shape}, {y.shape}')
         return x, y, [None]
 
     def __len__(self):
