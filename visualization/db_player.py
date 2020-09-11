@@ -230,7 +230,7 @@ class ViewDBCutVideos(OCVVideoThread):
             'LShoulder-LElbow-LWrist',
             'RShoulder-Neck-LShoulder',
             'l-Wrist-l-ThumbProximal-l-ThumbDistal',
-            # 'r-Wrist-r-ThumbProximal-r-ThumbDistal',
+            'r-Wrist-r-ThumbProximal-r-ThumbDistal',
             # 'l-Wrist-l-IndexFingerProximal-l-IndexFingerDistal',
             # 'r-Wrist-r-IndexFingerProximal-r-IndexFingerDistal',
             # 'l-Wrist-l-MiddleFingerProximal-l-MiddleFingerDistal',
@@ -238,7 +238,7 @@ class ViewDBCutVideos(OCVVideoThread):
             # 'l-Wrist-l-RingFingerProximal-l-RingFingerDistal',
             # 'r-Wrist-r-RingFingerProximal-r-RingFingerDistal',
             # 'l-Wrist-l-LittleFingerProximal-l-LittleFingerDistal',
-            'r-Wrist-r-LittleFingerProximal-r-LittleFingerDistal'
+            #'r-Wrist-r-LittleFingerProximal-r-LittleFingerDistal'
         ]
         
         self.color_array = ['#e53242', '#ffb133', '#3454da', '#ddc3d0', '#005a87', '#df6722', '#00ffff',
@@ -309,7 +309,7 @@ class ViewDBCutVideos(OCVVideoThread):
             self.__write_info_2_im(frame, font_scale=1)
 
             if self.frame_angle is not None:
-                frame = self.__hconcat_resize_min([frame, self.frame_angle])
+                frame = self.hconcat_resize_min([frame, self.frame_angle])
 
         self.last_frame = frame
         return ret, frame
@@ -320,7 +320,7 @@ class ViewDBCutVideos(OCVVideoThread):
         return tuple(int(h[i:i+2], 16) for i in (0, 2, 4))
 
     @staticmethod
-    def __hconcat_resize_min(im_list, interpolation=cv2.INTER_CUBIC):
+    def hconcat_resize_min(im_list, interpolation=cv2.INTER_CUBIC):
         h_max = max(im.shape[0] for im in im_list)
         im_list_resize = [cv2.resize(im, (int(im.shape[1] * h_max / im.shape[0]), h_max), interpolation=interpolation)
                           for im in im_list]
