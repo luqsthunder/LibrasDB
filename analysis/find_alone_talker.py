@@ -3,6 +3,7 @@ import numpy as np
 from tqdm import tqdm
 import os
 import cv2 as cv
+import face_recognition
 
 # %%
 all_videos = pd.read_csv('all_videos.csv')
@@ -46,11 +47,12 @@ def find_where_signaling_is_quiet(all_video_df, folder_name, talker_id, pbar=Non
     talker_1_signs = all_video_df[all_video_df.folder_name == folder_name]
     talker_1_signs = talker_1_signs[talker_1_signs.talker_id == talker_id]
     talker_1_signs = talker_1_signs[talker_1_signs.hand == 'D']
-    if talker_1_signs.shape[0] == 0:
-        return []
 
-    talker_1_times =[(x[1].beg, x[1].end)
-                     for x in talker_1_signs.iterrows() if x[1].talker_id == talker_id]
+    if talker_1_signs.shape[0] == 0:
+        return None
+
+    talker_1_times = [(x[1].beg, x[1].end)
+                      for x in talker_1_signs.iterrows() if x[1].talker_id == talker_id]
     talker_1_times = sorted(talker_1_times, key=lambda x: x[0])
 
     last_beg = talker_1_times[0][0]
@@ -113,6 +115,7 @@ for it in range(len(all_videos_in_folder)):
 # %%
 all_left_whites_count = []
 all_lefts = {'Left': 0, 'Right': 0}
+faces = None
 for curr_hole_pos in tqdm(range(len(signer_1_holes))):
     # curr_hole_pos =
     fps = int(all_videos_in_folder[0].get(cv.CAP_PROP_FPS))
@@ -127,6 +130,10 @@ for curr_hole_pos in tqdm(range(len(signer_1_holes))):
     frame = cv.cvtColor(frame, cv.COLOR_BGR2GRAY)
     curr_video_pos_msec = all_videos_in_folder[0].get(cv.CAP_PROP_POS_MSEC)
     last_msec = curr_video_pos_msec
+
+    if faces is None:
+        faces = face_recognition.face_locations(frame)
+        break
 
     left_most_white = []
     while curr_video_pos_msec <= end_frame_time:
@@ -173,28 +180,35 @@ for curr_hole_pos in tqdm(range(len(signer_1_holes))):
 # %%
 def find_all_left_signaler(all_vid_df):
     folders = all_vid_df.folder_name.unique().tolist()
-    db_path = 'D:/gdrive/LibrasCorpus/Santa Catarina/Inventario Libras'
-    db_folders_path = [os.path.join(db_path, x) for x in os.listdir(db_path)]
+    db_path = '/media/usuario/Others/gdrive'
 
-    for f in tqdm(folders[11:12]):
-        print(f)
-        vid = cv.VideoCapture(f)
+    for k, f in tqdm(enumerate(folders[0:16])):
+        f_path = os.path.join(db_path, f)
+        vid = cv.VideoCapture(f_path)
 
-        signer_1_holes = find_where_signaling_is_quiet(all_vid_df, f, 1)
-        if len(signer_1_holes) == 0:
-            signer_1_holes = find_where_signaling_is_quiet(all_vid_df, f, 2)
-        print(len(signer_1_holes))
+        curr_signer_num = 1
+        signer_holes = find_where_signaling_is_quiet(all_vid_df, f, 1)
+        if signer_holes is None:
+            curr_signer_num = 2
+            signer_holes = find_where_signaling_is_quiet(all_vid_df, f, 2)
+        elif len(signer_holes) == 0:
+            curr_signer_num = 2
+            signer_holes = find_where_signaling_is_quiet(all_vid_df, f, 2)
 
-        res = find_left_signaler_in_one_video(vid, signer_1_holes)
+        if len(signer_holes) == 0:
+            # aki eu testo o caso de ser vazio.
+            continue
 
+        res = find_left_signaler_in_one_video(vid, signer_holes)
+        print(res, curr_signer_num)
         vid.release()
-
-        print(res)
 
 
 def find_left_signaler_in_one_video(vid, holes):
     all_left_whites_count = []
     all_left_in_video = {'Left': 0, 'Right': 0}
+    x_middle = None
+
     for c_hole_pos in range(len(holes)):
         fps = int(vid.get(cv.CAP_PROP_FPS))
         beg_frame_time = holes[c_hole_pos]['beg']
@@ -208,10 +222,13 @@ def find_left_signaler_in_one_video(vid, holes):
 
         ret, frame = vid.read()
         if not ret:
-            print(mili_to_minutes(curr_video_pos_msec))
+            print(mili_to_minutes(beg_frame_time))
             break
         frame = cv.cvtColor(frame, cv.COLOR_BGR2GRAY)
         curr_video_pos_msec = vid.get(cv.CAP_PROP_POS_MSEC)
+
+        if x_middle is None:
+            x_middle = find_middle_xpoint_in_faces_bbox(frame)
 
         left_most_white = []
         while curr_video_pos_msec <= end_frame_time:
@@ -220,13 +237,13 @@ def find_left_signaler_in_one_video(vid, holes):
             last_frame = frame
             (thresh, curr_frame) = cv.threshold(curr_frame, 127, 255, cv.THRESH_BINARY)
 
-            left = curr_frame[:, :curr_frame.shape[1] // 2]
-            right = curr_frame[:, curr_frame.shape[1] // 2:]
+            left = curr_frame[:, int(x_middle):]
+            right = curr_frame[:, :int(x_middle)]
 
             left_most_white.append(np.count_nonzero(left > 1) < np.count_nonzero(right > 1))
 
-            # cv.imshow('window', cv.vconcat([curr_frame, frame]))
-            # key = cv.waitKey(fps)
+            # cv.imshow('window',  left)
+            # key = cv.waitKey(-1)
             # if key == 27:  # exit on ESC
             #     break
 
@@ -244,7 +261,21 @@ def find_left_signaler_in_one_video(vid, holes):
         all_left_in_video['Right'] += white_count[False] if False in white_count else 0
 
         all_left_whites_count.append(white_count)
+
     return all_left_in_video
 
 
+def find_middle_xpoint_in_faces_bbox(frame):
+    faces = face_recognition.face_locations(frame, number_of_times_to_upsample=1, model='cnn')
+    middle_xpoint = (np.abs(faces[0][3] - faces[1][3]) / 2) + min([faces[0][3], faces[1][3]])
+    return middle_xpoint
+
+
 find_all_left_signaler(all_videos)
+
+# %%
+tk_1_signs = all_videos[all_videos.folder_name == folders[11]]
+print(tk_1_signs.shape)
+tk_1_signs = tk_1_signs[tk_1_signs.talker_id == 2]
+tk_1_signs = tk_1_signs[tk_1_signs.hand == 'D']
+print(tk_1_signs.shape)
