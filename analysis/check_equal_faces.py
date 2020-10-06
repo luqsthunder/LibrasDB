@@ -8,11 +8,12 @@ from tqdm import tqdm
 from sklearn.svm import SVC
 from sklearn.ensemble import RandomForestClassifier, VotingClassifier, AdaBoostClassifier
 from sklearn.neighbors import KNeighborsClassifier as KNN
+import shutil
 import face_recognition
 
 
 # %%
-db_path = '/home/lucasamaral/Documents/LibrasCorpus/Santa Catarina/Inventario Libras'
+db_path = '/media/usuario/Others/gdrive/LibrasCorpus/Santa Catarina/Inventario Libras'
 db_folders_path = [os.path.join(db_path, x) for x in os.listdir(db_path)]
 db_folders_path = sorted(db_folders_path, key=lambda x: int(x.split(' v')[-1]), reverse=True)
 
@@ -424,3 +425,20 @@ db_path = '/home/lucasamaral/Documents/LibrasCorpus/Santa Catarina/Inventario Li
 db_folders_path = [os.path.join(db_path, x) for x in os.listdir(db_path)]
 db_folders_path = sorted(db_folders_path, key=lambda x: int(x.split(' v')[-1]), reverse=True)
 print(db_folders_path)
+
+# %%
+for db_folder in tqdm(db_folders_path):
+    non_ended_in_cam = sorted(list(filter(lambda x: '1.mp4' in x, os.listdir(db_folder))),
+                              key=lambda x: int(x.split('.mp4')[0][-1]))
+    non_ended_in_cam = list(filter(lambda x: 'FLN' in x, non_ended_in_cam))
+
+    ended_in_cam = list(filter(lambda x: 'm.mp4' in x, os.listdir(db_folder)))
+    new_video = list(filter(lambda x: 'new_video_' in x, os.listdir(db_folder)))
+
+    if len(ended_in_cam) > 0:
+        shutil.copy(os.path.join(db_folder, ended_in_cam[0]), os.path.join(db_folder, non_ended_in_cam[0]))
+    elif len(new_video) > 0:
+        shutil.copy(os.path.join(db_folder, new_video[0]), os.path.join(db_folder, non_ended_in_cam[0]))
+    # else:
+    #     print(non_ended_in_cam)
+    #shutil.copy(ended_in_cam, non_ended_in_cam)
