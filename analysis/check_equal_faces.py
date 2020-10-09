@@ -303,6 +303,8 @@ for it in range(len(all_videos_in_folder)):
 font = cv.FONT_HERSHEY_SIMPLEX
 def find_faces_ids_and_embedings_sorted_left_2_right(captures, show_video1_frame=False, fig_name=None):
     ret, frame = captures[0].read()
+    if not ret:
+        return [], []
 
     faces = face_recognition.face_locations(frame[:, :, ::-1], number_of_times_to_upsample=1, model='cnn')
     f1_mid = np.abs((faces[0][1] - faces[0][3]) / 2) + faces[0][3]
@@ -337,7 +339,7 @@ def find_faces_ids_and_embedings_sorted_left_2_right(captures, show_video1_frame
         cv.putText(frame, str(f'person_{vid2_id} {p2_str}'), (int(f2_mid) + 5, faces[0][2] - 5), font, 0.5,
                    (50, 205, 50), 2)
 
-        print(x_middle, frame.shape, f1_mid, f2_mid)
+        # print(x_middle, frame.shape, f1_mid, f2_mid)
 
         vid1_id = np.argmax(vid1_id) + 1
         vid2_id = np.argmax(vid2_id) + 1
@@ -346,10 +348,10 @@ def find_faces_ids_and_embedings_sorted_left_2_right(captures, show_video1_frame
         ret, left_frame = captures[vid1_id].read() if p1_str == 'left' else captures[vid2_id].read()
         ret, right_frame = captures[vid1_id].read() if p2_str == 'left' else captures[vid2_id].read()
         frame = cv.hconcat([frame, left_frame, right_frame])
-        fig: plt.Figure = plt.figure(1, dpi=720//9, figsize=(21, 9))
-        plt.imshow(frame)
-        plt.show()
+        plt.figure(0, dpi=720//9, figsize=(21, 9))
+        plt.imshow(frame[:, :, ::-1])
         plt.savefig(f'../fig-folder-libras/{fig_name}.pdf')
+        plt.show()
 
     left_id = np.argmax(knn.predict_proba(left_encodings.reshape((1, -1))))
     right_id = np.argmax(knn.predict_proba(right_encodings.reshape((1, -1))))
@@ -395,13 +397,24 @@ def check_person_in_single_videos(vc, clf, is_left, amount_frames=20, pbar=None)
 
 # %%
 for db_folder in tqdm(db_folders_path):
+    v_part = db_folder.split(' v')[-1]
+    fig_name_path = f'../fig-folder-libras/{v_part}.pdf'
+    if os.path.exists(fig_name_path):
+        continue
+
     all_videos_in_folder = sorted(list(filter(lambda x: '.mp4' in x, os.listdir(db_folder))),
                                   key=lambda x: int(x.split('.mp4')[0][-1]))
     all_videos_in_folder = [cv.VideoCapture(os.path.join(db_folder, x)) for x in all_videos_in_folder]
+    if len(all_videos_in_folder) < 3:
+        for it in range(len(all_videos_in_folder)):
+            all_videos_in_folder[it].release()
+
+        continue
+
     for it in range(len(all_videos_in_folder)):
         all_videos_in_folder[it].set(cv.CAP_PROP_POS_FRAMES, 30 * 60 * 1)
 
-    v_part = db_folder.split(' v')[-1]
+
     encodes, p_ids = find_faces_ids_and_embedings_sorted_left_2_right(all_videos_in_folder, show_video1_frame=True,
                                                                       fig_name=v_part)
 
