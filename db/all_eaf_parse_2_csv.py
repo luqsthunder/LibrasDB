@@ -153,7 +153,7 @@ class AllEAFParser2CSV:
         # saber ja que vamos extrair o esqueleto posteriormente.
         row_2_drop = []
         path_2_dup_all_videos = os.path.join(path_to_save_sign_df,
-                                             'dupl-all_videos.csv')
+                                             '../dupl-all_videos.csv')
         libras_df.to_csv(path_2_dup_all_videos, index=False)
         pbar_dup = tqdm(total=libras_df.shape[0], desc='dups') \
             if pbar_dup is None else pbar_dup
@@ -179,7 +179,7 @@ class AllEAFParser2CSV:
         single_list_drop = list(set(single_list_drop))
         libras_df = libras_df.drop(single_list_drop)
 
-        path_2_all_videos = os.path.join(path_to_save_sign_df, 'all_videos.csv')
+        path_2_all_videos = os.path.join(path_to_save_sign_df, '../all_videos.csv')
         libras_df.to_csv(path_2_all_videos, index=False)
 
     def remove_db_df_path_specific(self, df):
@@ -269,7 +269,7 @@ class AllEAFParser2CSV:
         a legenda dentro desse intervalo de tempo.
         """
 
-        tier_xpath = "//TIER[contains(normalize-space(@TIER_ID),'Sinais')]" \
+        tier_xpath = "//TIER[contains(normalize-space(@TIER_ID),'SinaisD')]" \
                      "/@TIER_ID"
         all_tiers_with_sing = elementpath.select(tree, tier_xpath)
 
@@ -424,7 +424,7 @@ class AllEAFParser2CSV:
 
 
 if __name__ == '__main__':
-    db_cut_videos = AllEAFParser2CSV('D:/gdrive/LibrasCorpus')
+    db_cut_videos = AllEAFParser2CSV('/home/usuario/Documents/LibrasCorpus')
     db_cut_videos.process(path_to_save_sign_df='./')
     print(db_cut_videos.bad_subs, file=open('bad_subs.txt', mode='w'))
     print(db_cut_videos.bad_videos, file=open('bad_videos.txt', mode='w'))

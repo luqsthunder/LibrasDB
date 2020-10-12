@@ -5,8 +5,6 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from tqdm import tqdm
-from sklearn.svm import SVC
-from sklearn.ensemble import RandomForestClassifier, VotingClassifier, AdaBoostClassifier
 from sklearn.neighbors import KNeighborsClassifier as KNN
 
 
@@ -15,10 +13,23 @@ class SyncSubtitles2Videos:
     def __init__(self, all_videos, db_path):
         self.db_path = db_path
         self.all_videos = all_videos if isinstance(all_videos, pd.DataFrame) else pd.read_csv(all_videos)
-        self.folders = self.all_videos.folder_name.unique().tolist()
-        self.db_folders_path = [os.path.join(self.db_path, x) for x in os.listdir(self.db_path)]
+        self.folders = self.all_videos.folder.unique().tolist()
+        self.db_folders_path = [os.path.join(self.db_path, x) for x in self.folders]
         self.db_folders_path = sorted(self.db_folders_path, key=lambda x: int(x.split(' v')[-1]), reverse=True)
         self.font = cv.FONT_HERSHEY_SIMPLEX
+
+    @staticmethod
+    def __find_video_in_folder_by_num(folder_path: str, num: int):
+        videos_path = list(filter(lambda x: '.mp4' in x, os.listdir(folder_path)))
+        for video in videos_path:
+            try:
+                num_in_video = int(video.split('.mp4')[0][-1])
+                if num_in_video == num:
+                    return video
+            except BaseException:
+                continue
+
+        return None
 
     def find_all_left_signaler(self):
         """
@@ -36,43 +47,50 @@ class SyncSubtitles2Videos:
         """
 
         all_persons_df = pd.DataFrame()
-        for k, f in tqdm(enumerate(self.folders[8:10])):
+        for k, f in tqdm(enumerate(self.folders)):
             f_path = os.path.join(self.db_path, f)
-            vid = cv.VideoCapture(f_path)
+            v_part = f.split(' v')[-1]
+
+            video_path = self.__find_video_in_folder_by_num(f_path, 1)
+            video_path = os.path.join(f_path, video_path)
+
+            vid = cv.VideoCapture(video_path)
 
             p1_interruptible_speach = False
             p2_interruptible_speach = False
 
-            curr_signer_num = 1
-            signer_holes = self.__find_where_subtitle_has_holes(f, 1)
-            if signer_holes is None:
-                curr_signer_num = 2
-                signer_holes = self.__find_where_subtitle_has_holes(f, 2)
-            elif len(signer_holes) == 0:
+            curr_signaler_quiet = 1
+            signaling_quiet_moments = self.__find_where_signaling_is_quiet(f, 1)
+            if signaling_quiet_moments is None:
+                curr_signaler_quiet = 2
+                signaling_quiet_moments = self.__find_where_signaling_is_quiet(f, 2)
+            elif len(signaling_quiet_moments) == 0:
                 p1_interruptible_speach = True
-                curr_signer_num = 2
-                signer_holes = self.__find_where_subtitle_has_holes(f, 2)
+                curr_signaler_quiet = 2
+                signaling_quiet_moments = self.__find_where_signaling_is_quiet(f, 2)
 
-            if signer_holes is None:
+            if signaling_quiet_moments is None:
                 continue
 
-            if len(signer_holes) == 0:
+            if len(signaling_quiet_moments) == 0:
                 p2_interruptible_speach = True
                 if not (bool(p1_interruptible_speach) != bool(p1_interruptible_speach)):
                     continue
 
-                curr_signer_num = 1 if p1_interruptible_speach and not p2_interruptible_speach else 2
-                curr_beg_pos = self.all_videos[self.all_videos.folder_name == f]
-                curr_beg_pos = curr_beg_pos[curr_beg_pos.talker_id == curr_signer_num].beg.iloc[0]
-                signer_holes = [dict(beg=curr_beg_pos, end=curr_beg_pos + 5000)]
+                curr_signaler_quiet = 1 if p1_interruptible_speach and not p2_interruptible_speach else 2
+                curr_beg_pos = self.all_videos[self.all_videos.folder == f]
+                curr_beg_pos = curr_beg_pos[curr_beg_pos.talker_id == curr_signaler_quiet].beg.iloc[0]
+                signaling_quiet_moments = [dict(beg=curr_beg_pos, end=curr_beg_pos + 5000)]
 
-            res = self.__find_left_signaling_in_single_video(vid, signer_holes)
-            left_id, right_id = self.__from_left_signaling_result(res, curr_signer_num)
+            res = self.__find_left_signaling_in_single_video(vid, signaling_quiet_moments, debug_frame=False)
+            left_id, right_id = self.__from_left_signaling_result(res, curr_signaler_quiet)
             print(res, left_id, right_id)
-            # all_persons_df = all_persons_df.append(pd.DataFrame(dict(
-            #     folder_name=[f], person_1=[left_id], person_2=[right_id]
-            # )))
+            all_persons_df = all_persons_df.append(pd.DataFrame(dict(
+                folder_name=[f], left_person=[left_id], right_person=[right_id],
+                v_part=[v_part]
+            )))
             vid.release()
+        all_persons_df.to_csv('all_persons_from_subtitle.csv')
 
     def process_all_folders_2_sync_with_person_2_video(self):
         if not os.path.exists('vid_sync.csv'):
@@ -140,17 +158,17 @@ class SyncSubtitles2Videos:
     def __from_left_signaling_result(result, talker_id):
         left_id = 0
         right_id = 0
-        if result['left'] > result['right']:
+        if result['Left'] < result['Right']:
             left_id = talker_id
-        elif result['left'] < result['right']:
+        elif result['Right'] < result['Left']:
             right_id = talker_id
         else:
             print('ERROR in comparing left signalers')
 
         if left_id == 0:
-            right_id = 1 if left_id == 2 else 2
-        elif right_id == 0:
             left_id = 1 if right_id == 2 else 2
+        elif right_id == 0:
+            right_id = 1 if left_id == 2 else 2
 
         return left_id, right_id
 
@@ -161,39 +179,52 @@ class SyncSubtitles2Videos:
         return middle_xpoint
 
     @staticmethod
-    def _make_talkers_motion_check(vid, end_frame_time, x_middle):
+    def _make_talkers_motion_check(vid, end_frame_time, x_middle, debug_frames=False):
         last_frame = None
 
         ret, frame = vid.read()
         if not ret:
             return []
 
-        frame = cv.cvtColor(frame, cv.COLOR_BGR2GRAY)
+        gray_frame = cv.cvtColor(frame, cv.COLOR_BGR2GRAY)
         curr_video_pos_msec = vid.get(cv.CAP_PROP_POS_MSEC)
 
         if x_middle is None:
             x_middle = SyncSubtitles2Videos.__find_middle_xpoint_in_faces_bbox(frame)
 
-        left_most_white = []
+        most_white = []
         while curr_video_pos_msec <= end_frame_time:
-            (thresh, frame) = cv.threshold(frame, 127, 255, cv.THRESH_BINARY)
-            curr_frame = frame - last_frame if last_frame is not None else frame
-            last_frame = frame
+            (thresh, bin_frame) = cv.threshold(gray_frame, 127, 255, cv.THRESH_BINARY)
+            curr_frame = bin_frame - last_frame if last_frame is not None else bin_frame
+            last_frame = bin_frame
             (thresh, curr_frame) = cv.threshold(curr_frame, 127, 255, cv.THRESH_BINARY)
 
-            left = curr_frame[:, int(x_middle):]
-            right = curr_frame[:, :int(x_middle)]
+            left = curr_frame[:, :int(x_middle)]
+            right = curr_frame[:, int(x_middle):]
 
-            left_most_white.append(np.count_nonzero(left > 1) < np.count_nonzero(right > 1))
+            if debug_frames:
+                # key = 0
+                # while key != 27:
+                final_frame = cv.hconcat([left, right, gray_frame])
+                cv.imshow('debug_make_talker_motion_check', final_frame)
+                key = cv.waitKey(30)
 
-            ret, frame = vid.read()
+            most_white.append([np.count_nonzero(left > 1), np.count_nonzero(right > 1)])
+
+            ret, bin_frame = vid.read()
             if not ret:
                 print(curr_video_pos_msec)
                 break
-            frame = cv.cvtColor(frame, cv.COLOR_BGR2GRAY)
+            gray_frame = cv.cvtColor(bin_frame, cv.COLOR_BGR2GRAY)
             curr_video_pos_msec = vid.get(cv.CAP_PROP_POS_MSEC)
 
-        return left_most_white, x_middle
+        cv.destroyAllWindows()
+
+        most_talkers = [
+            np.sum([x[0] for x in most_white]),
+            np.sum([x[1] for x in most_white])
+        ]
+        return most_talkers, x_middle
 
     def _face_rec_create_encodings(self, vc, amount_faces: int = 20, show=False, ret_amount_faces=False,
                                    pbar: tqdm = None):
@@ -434,7 +465,7 @@ class SyncSubtitles2Videos:
         return ([p1_encodings if left_id == 0 else p2_encodings, p1_encodings if right_id == 0 else p2_encodings],
                 [left_id + 1, right_id + 1])
 
-    def __find_left_signaling_in_single_video(self, vid, holes):
+    def __find_left_signaling_in_single_video(self, vid, holes, debug_frame=False):
         """
 
         Parameters
@@ -443,7 +474,6 @@ class SyncSubtitles2Videos:
         holes: List
 
         """
-        all_left_whites_count = []
         all_left_in_video = {'Left': 0, 'Right': 0}
         x_middle = None
 
@@ -456,19 +486,15 @@ class SyncSubtitles2Videos:
 
             end_frame_time = holes[c_hole_pos]['end']
 
-            left_most_white, x_middle = self._make_talkers_motion_check(vid, end_frame_time, x_middle)
+            most_white, x_middle = self._make_talkers_motion_check(vid, end_frame_time, x_middle, debug_frame)
 
-            unique, counts = np.unique(np.array(left_most_white), return_counts=True)
-            white_count = dict(zip(unique, counts))
-            all_left_in_video['Left'] += white_count[True] if True in white_count else 0
+            all_left_in_video['Left'] += most_white[0]
 
-            all_left_in_video['Right'] += white_count[False] if False in white_count else 0
-
-            all_left_whites_count.append(white_count)
+            all_left_in_video['Right'] += most_white[1]
 
         return all_left_in_video
 
-    def __find_where_subtitle_has_holes(self, folder_name, talker_id, pbar=None):
+    def __find_where_signaling_is_quiet(self, folder_name, talker_id, pbar=None):
         """
         Acha onde um sinalizador de uma legenda na pasta do projeto não fala nada.
 
@@ -483,9 +509,9 @@ class SyncSubtitles2Videos:
         returns: List
             holes, lista com os locais onde o sinalizador não fala.
         """
-        talker_1_signs = self.all_video_df[self.all_video_df.folder_name == folder_name]
+        talker_1_signs = self.all_videos[self.all_videos.folder == folder_name]
         talker_1_signs = talker_1_signs[talker_1_signs.talker_id == talker_id]
-        talker_1_signs = talker_1_signs[talker_1_signs.hand == 'D']
+        # talker_1_signs = talker_1_signs[talker_1_signs.hand == 2]
 
         if talker_1_signs.shape[0] == 0:
             return None
@@ -538,5 +564,8 @@ class SyncSubtitles2Videos:
 
 if __name__ == '__main__':
     sync_vid_db = SyncSubtitles2Videos('all_videos.csv',
-                                       '/media/usuario/Others/gdrive/LibrasCorpus/Santa Catarina/Inventario Libras')
-    sync_vid_db.process_all_folders_2_sync_with_person_2_video()
+                                       '/home/usuario/Documents/LibrasCorpus')
+    #sync_vid_db.process_all_folders_2_sync_with_person_2_video()
+    sync_vid_db.find_all_left_signaler()
+    print('vpart')
+
