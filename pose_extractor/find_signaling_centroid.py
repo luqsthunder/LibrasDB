@@ -6,7 +6,8 @@ from tqdm import tqdm
 class FindSignalingCentroid:
 
     def __init__(self, all_videos_csv_path):
-        self._df = pd.read_csv(all_videos_csv_path, index_col=0)
+        self._df = all_videos_csv_path if isinstance(all_videos_csv_path, pd.DataFrame) \
+                                       else pd.read_csv(all_videos_csv_path, index_col=0)
 
     def process_all(self):
         pass

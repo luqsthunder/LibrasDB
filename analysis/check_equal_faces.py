@@ -13,7 +13,7 @@ import face_recognition
 
 
 # %%
-db_path = '/media/usuario/Others/gdrive/LibrasCorpus/Santa Catarina/Inventario Libras'
+db_path = 'D:/gdrive/LibrasCorpus/Santa Catarina/Inventario Libras'
 db_folders_path = [os.path.join(db_path, x) for x in os.listdir(db_path)]
 db_folders_path = sorted(db_folders_path, key=lambda x: int(x.split(' v')[-1]), reverse=True)
 

@@ -153,4 +153,3 @@ def make_dict_hand_parts(datum: DatumLike, hand_parts: list,
             pose_dic.update({('l-' + part): None})
 
     return pose_dic
-
