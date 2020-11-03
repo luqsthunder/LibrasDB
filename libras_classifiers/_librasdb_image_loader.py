@@ -1,4 +1,4 @@
-from libras_classifier.librasdb_loaders import DBLoader2NPY
+from libras_classifiers.librasdb_loaders import DBLoader2NPY
 from tqdm import tqdm
 import pandas as pd
 

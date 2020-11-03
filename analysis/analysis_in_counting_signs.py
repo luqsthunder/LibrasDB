@@ -8,7 +8,7 @@ import matplotlib.ticker as ticker
 import cv2 as cv
 
 
-db_path = '../all_videos.csv'
+db_path = 'all_videos.csv'
 sign_db = pd.read_csv(db_path)
 print(sign_db.head(n=10))
 
@@ -19,11 +19,16 @@ for sign in tqdm(signs_name):
     count_signs.append(dict(name=sign,
                             count=sign_db[sign_db.sign == sign].sign.count()))
 
+
+
 sorted_signs = sorted(count_signs, reverse=True, key=lambda x: x['count'])
+each_sign_duration = []
 sorted_sings_count_mode = []
 for x in sorted_signs:
+    # caso seja menor que 30 a quantidade de amostras do sinal desconsidere-o.
     if x['count'] < 30:
         continue
+
     sorted_sings_count_mode.extend([x['name']] * int(x['count']))
 
 more_than_30_df = pd.DataFrame(data=dict(sign=sorted_sings_count_mode))

@@ -94,9 +94,9 @@ def make_angle_df_from_xy(sample: pd.DataFrame, no_hands=False, pbar: tqdm = Non
 
         """
         angle = None
-        if (not ((0 in r[parts[0]]) or r[parts[0]] is None)) and \
-           (not ((0 in r[parts[1]]) or r[parts[1]] is None)) and \
-           (not ((0 in r[parts[2]]) or r[parts[2]] is None)):
+        if (not ((0 in r[parts[0]]) or r[parts[0]] is None or any(np.isnan(r[parts[0]])) )) and \
+           (not ((0 in r[parts[1]]) or r[parts[1]] is None or any(np.isnan(r[parts[1]])) )) and \
+           (not ((0 in r[parts[2]]) or r[parts[2]] is None or any(np.isnan(r[parts[2]])) )):
             angle = convert_xypose_to_dir_angle(r[parts[0]][:2], r[parts[1]][:2], r[parts[2]][:2])
 
         return angle
@@ -119,8 +119,8 @@ def make_angle_df_from_xy(sample: pd.DataFrame, no_hands=False, pbar: tqdm = Non
                 angle_data.update({angle_part_name: [angle_pose]})
         if not no_hands and hand_angles is not None:
             for angle_part in hand_angles:
-                left_hand_angle_part = ['l-' + x for x in angle_part]
-                right_hand_angle_part = ['r-' + x for x in angle_part]
+                left_hand_angle_part = ['left-' + x for x in angle_part]
+                right_hand_angle_part = ['right-' + x for x in angle_part]
 
                 left_angle_part_name = '-'.join(left_hand_angle_part)
                 right_angle_part_name = '-'.join(right_hand_angle_part)
@@ -141,7 +141,7 @@ def make_angle_df_from_xy(sample: pd.DataFrame, no_hands=False, pbar: tqdm = Non
     return pose_angle_df
 
 
-def convert_all_samples_xy_2_angle(db_path, no_hands=False):
+def convert_all_samples_xy_2_angle(db_path, no_hands=False, custom_dir=None):
     """
     Convert all samples in xy folder to angle.
 
@@ -159,7 +159,7 @@ def convert_all_samples_xy_2_angle(db_path, no_hands=False):
 
     sample_pbar = tqdm(position=2)
 
-    amount_samples = count_samples_in_database(db_path, no_hands)
+    amount_samples = count_samples_in_database(db_path, no_hands, custom_dir=custom_dir)
     folder_pbar = tqdm(position=1)
     folder_pbar.reset(total=amount_samples)
 
@@ -171,7 +171,17 @@ def convert_all_samples_xy_2_angle(db_path, no_hands=False):
                        for x in hand_angle_pair]
 
     for sample_xy, class_name, sample_name in yield_all_db_samples(db_path, no_hands):
-        sample_path = os.path.join(db_path, class_name, dir_before_samples_name, sample_name)
+
+        signs_info = sample_name.split('---')
+        v_part = signs_info[
+            0]  # signs_info[3] + signs_info[4] if 'Inventário Nacional de Libras' in sample_name else signs_info[3]
+        only_sample_name = f'{v_part}---{signs_info[1]}---{signs_info[2]}---{signs_info[3]}---{signs_info[-1][0]}' \
+                           f'---sample-angle.csv'
+
+        sample_path = os.path.join(db_path, class_name, dir_before_samples_name, only_sample_name)
+
+        folder_path = os.path.join(db_path, class_name, dir_before_samples_name)
+        os.makedirs(folder_path, exist_ok=True)
 
         if os.path.exists(sample_path):
             folder_pbar.update(1)
@@ -180,10 +190,6 @@ def convert_all_samples_xy_2_angle(db_path, no_hands=False):
 
         folder_pbar.set_description(class_name)
 
-        signs_info = sample_name.split('-')
-        folder_name = signs_info[3] + signs_info[4] if 'Inventário Nacional de Libras' in sample_name else signs_info[3]
-        only_sample_name = f'sample-angle-{signs_info[2]}-{folder_name}-{signs_info[5]}-beg-{signs_info[7]}-end-' \
-                           f'{signs_info[9]}'
         sample_angle_df = make_angle_df_from_xy(sample_xy, False, pbar=sample_pbar, sample_name=only_sample_name,
                                                 body_angles=body_angle_pairs_to_7, hand_angles=hand_angle_pair)
 
@@ -193,10 +199,13 @@ def convert_all_samples_xy_2_angle(db_path, no_hands=False):
         folder_pbar.refresh()
 
 
-def count_samples_in_database(db_path, no_hands=False, xy=True):
+def count_samples_in_database(db_path, no_hands=False, xy=True, custom_dir=None):
     amount_samples = 0
     dir_before_samples_name = 'no_hands' if no_hands else 'hands'
     dir_before_samples_name += '-xy' if xy else '-angle'
+
+    if custom_dir is not None:
+        dir_before_samples_name = custom_dir
 
     for sample_dir in os.listdir(db_path):
         sample_dir = os.path.join(db_path, sample_dir, dir_before_samples_name)
@@ -226,23 +235,35 @@ def yield_all_db_samples(db_path, no_hands=False, xy=True):
         yielded.
     """
 
-    dir_before_samples_name = 'no_hands' if no_hands else 'hands'
-    dir_before_samples_name += '-xy' if xy else '-angle'
-    for sample_dir in os.listdir(db_path):
-        class_name = sample_dir
-        sample_dir = os.path.join(db_path, sample_dir, dir_before_samples_name)
+    # dir_before_samples_name = 'no_hands' if no_hands else 'hands'
+    # dir_before_samples_name += '-xy' if xy else '-angle'
+    # for sample_dir in os.listdir(db_path):
+    #     class_name = sample_dir
+    #     sample_dir = os.path.join(db_path, sample_dir, dir_before_samples_name)
+    #
+    #     for sample_path in os.listdir(sample_dir):
+    #         sample_name = sample_path
+    #         sample_path = os.path.join(sample_dir, sample_path)
+    #         if '.csv' in sample_path:
+    #             sample = pd.read_csv(sample_path)
+    #             sample = sample.applymap(DBLoader2NPY.parse_npy_vec_str)
+    #             yield sample, class_name, sample_name
+    #         else:
+    #             yield None, class_name, sample_name
+    samples_path, class_dirs = DBLoader2NPY.read_all_db_folders(
+        db_path=db_path, only_that_classes=None, angle_or_xy='xy-hands', custom_internal_dir=''
+    )
 
-        for sample_path in os.listdir(sample_dir):
-            sample_name = sample_path
-            sample_path = os.path.join(sample_dir, sample_path)
-            if '.csv' in sample_path:
-                sample = pd.read_csv(sample_path)
-                sample = sample.applymap(DBLoader2NPY.parse_npy_vec_str)
-                yield sample, class_name, sample_name
-            else:
-                yield None, class_name, sample_name
+    for samples in samples_path:
+
+        xy_sample = pd.read_csv(samples[0])
+        xy_sample = xy_sample.applymap(DBLoader2NPY.parse_npy_vec_str)
+        cls_name = class_dirs[samples[1]].replace('\\', '/').split('/')[-1]
+        sample_name = samples[0].replace('\\', '/').split('/')[-1]
+
+        yield xy_sample, cls_name, sample_name
 
 
 if __name__ == '__main__':
     np.seterr(all='raise')
-    convert_all_samples_xy_2_angle('../libras-db-folders')
+    convert_all_samples_xy_2_angle('../sign_db_front_view', custom_dir='')

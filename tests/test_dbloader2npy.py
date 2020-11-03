@@ -8,11 +8,11 @@ class TestDBLoader2npy:
     BATCH_SIZE = 8
 
     def setup(self):
-        self.db = DBLoader2NPY('../libras-db-folders',
+        self.db = DBLoader2NPY('../libras-db-folders-debug',
                                angle_pose=False,
                                no_hands=False,
                                batch_size=self.BATCH_SIZE)
-        self.dbxy = DBLoader2NPY('../libras-db-folders',
+        self.dbxy = DBLoader2NPY('../libras-db-folders-debug',
                                  batch_size=self.BATCH_SIZE,
                                  angle_pose=False,
                                  no_hands=False,)
@@ -69,7 +69,13 @@ class TestDBLoader2npy:
             assert False
 
     def test_iterator_is_same_value(self):
-        pass
+        try:
+            self.db.fill_samples_absent_frames_with_na()
+            res_non_npy = self.db.batch_load_samples(list(range(self.BATCH_SIZE)), as_npy=False)
+            res = self.db[0]
+
+        except BaseException:
+            assert False
 
     def test_can_classify(self):
         max_len_seq = self.db.find_longest_sample()
