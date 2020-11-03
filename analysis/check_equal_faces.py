@@ -396,7 +396,7 @@ def check_person_in_single_videos(vc, clf, is_left, amount_frames=20, pbar=None)
     return ids
 
 # %%
-for db_folder in tqdm(db_folders_path):
+for db_folder in tqdm(db_folders_path[:2]):
     v_part = db_folder.split(' v')[-1]
     fig_name_path = f'../fig-folder-libras/{v_part}.pdf'
     if os.path.exists(fig_name_path):

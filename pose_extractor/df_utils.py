@@ -136,20 +136,20 @@ def make_dict_hand_parts(datum: DatumLike, hand_parts: list,
             try:
                 joint_val = datum.handKeypoints[0][person_pos_id,
                                                    HAND_PARTS[part]]#[: 2]
-                joint = {('r-' + part): [joint_val]}
+                joint = {('right-' + part): [joint_val]}
                 pose_dic.update(joint)
             except IndexError:
-                pose_dic.update({('r-' + part): None})
+                pose_dic.update({('right-' + part): None})
 
             try:
                 joint_val = datum.handKeypoints[1][person_pos_id,
                                                    HAND_PARTS[part]]#[: 2]
-                joint = {('l-' + part): [joint_val]}
+                joint = {('left-' + part): [joint_val]}
                 pose_dic.update(joint)
             except IndexError:
-                pose_dic.update({('l-' + part): None})
+                pose_dic.update({('left-' + part): None})
         else:
-            pose_dic.update({('r-' + part): None})
-            pose_dic.update({('l-' + part): None})
+            pose_dic.update({('right-' + part): None})
+            pose_dic.update({('left-' + part): None})
 
     return pose_dic
