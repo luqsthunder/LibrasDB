@@ -33,7 +33,7 @@ class ExtractMultipleVideos:
         def remove_unnamed_0_col(df):
             if 'Unnamed: 0' in df.keys():
                 return df.drop(columns=['Unnamed: 0'])
-            return  df
+            return df
 
         self.db_path = db_path
         self.all_videos = all_videos if isinstance(all_videos, pd.DataFrame) else pd.read_csv(all_videos)
@@ -45,7 +45,7 @@ class ExtractMultipleVideos:
         self.vid_sync = remove_unnamed_0_col(self.vid_sync)
 
         self.all_persons_subtitle = all_persons_subtitle if isinstance(all_persons_subtitle, pd.DataFrame) \
-                                                         else pd.read_csv(all_persons_subtitle)
+            else pd.read_csv(all_persons_subtitle)
         self.all_persons_subtitle = remove_unnamed_0_col(self.all_persons_subtitle)
 
         self.pose_centroid_tracker = PoseCentroidTracker(all_videos, all_videos, openpose_path=self.extractor,
@@ -69,7 +69,6 @@ class ExtractMultipleVideos:
 
             sings_in_folder = self._process_single_folder(v_part)
             for sign_df in sings_in_folder:
-
                 folder_path = os.path.join(self.path_to_save_dfs, sign_df['sign_name'])
                 os.makedirs(folder_path, exist_ok=True)
                 file_name = f'{v_part}---{sign_df["sign_name"]}---{sign_df["beg"]}---{sign_df["end"]}---' \
@@ -336,8 +335,10 @@ class ExtractMultipleVideos:
     def unittest_for___extract_signs_from_single_person_video(self):
 
         try:
-            res1 = self.__extract_sings_from_single_person_video(5000, 5000 + (1000 * 60), 1098, is_left=True, pbar=tqdm())
-            res2 = self.__extract_sings_from_single_person_video(5000, 5000 + (1000 * 60), 1098, is_left=False, pbar=tqdm())
+            res1 = self.__extract_sings_from_single_person_video(5000, 5000 + (1000 * 60), 1098, is_left=True,
+                                                                 pbar=tqdm())
+            res2 = self.__extract_sings_from_single_person_video(5000, 5000 + (1000 * 60), 1098, is_left=False,
+                                                                 pbar=tqdm())
             res1.to_csv('v1098_barely_front_view_left_person.csv')
             res2.to_csv('v1098_barely_front_view_right_person.csv')
         except BaseException:
@@ -463,11 +464,10 @@ class ExtractMultipleVideos:
         return centroid, (x_min, y_min, x_max, y_max)
 
 
-
-
 if __name__ == '__main__':
     sign_list = [
-       'NÃO', 'TER', 'BOM', 'E(esperar)','COMO', 'E(acabar)', 'VER', 'HOMEM', 'PORQUE', 'ESTUDAR'
+        # 'NÃO', 'TER', 'BOM', 'E(esperar)','COMO', 'E(acabar)', 'VER', 'HOMEM', 'PORQUE', 'ESTUDAR'
+        'HOMEM'
     ]
     extractMultipleVideos = ExtractMultipleVideos(db_path='D:/gdrive',
                                                   all_videos='all_videos.csv',
@@ -476,5 +476,7 @@ if __name__ == '__main__':
                                                   path_to_save_dfs='../sign_db_front_view',
                                                   needed_signs_list=sign_list,
                                                   all_persons_subtitle='all_persons_from_subtitle.csv')
-    extractMultipleVideos.process()
- 
+
+    extractMultipleVideos.unittest_for___extract_siun
+    # extractMultipleVideos.process()
+    # 217 sinais da palavra homem extraidos.

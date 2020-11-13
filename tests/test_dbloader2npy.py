@@ -1,4 +1,5 @@
 from libras_classifiers.librasdb_loaders import DBLoader2NPY
+from libras_classifiers._librasdb_image_loader import LibrasImageLoader
 
 #import tensorflow as tf
 
@@ -9,13 +10,22 @@ class TestDBLoader2npy:
 
     def setup(self):
         self.db = DBLoader2NPY('../libras-db-folders-debug',
-                               angle_pose=False,
+                               angle_pose=True,
                                no_hands=False,
-                               batch_size=self.BATCH_SIZE)
+                               batch_size=self.BATCH_SIZE,
+                               make_k_fold=True,
+                               add_angle_derivatives=True,
+                               k_fold_amount=5)
+
         self.dbxy = DBLoader2NPY('../libras-db-folders-debug',
                                  batch_size=self.BATCH_SIZE,
                                  angle_pose=False,
-                                 no_hands=False,)
+                                 no_hands=False)
+
+        self.db_image = LibrasImageLoader('../libras-db-folders-debug',
+                                          batch_size=self.BATCH_SIZE,
+                                          angle_pose=False,
+                                          no_hands=False)
 
     def test_constructor(self):
         try:

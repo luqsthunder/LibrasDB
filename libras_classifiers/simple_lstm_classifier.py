@@ -6,10 +6,19 @@ from sklearn.preprocessing import StandardScaler
 import numpy as np
 import tensorflow as tf
 import argparse
+import matplotlib.pyplot as plt
 import pandas as pd
-
+from sklearn.svm import SVC
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.ensemble import AdaBoostClassifier, RandomForestClassifier
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.metrics import accuracy_score
 
 # %%
+batch_size = 16
+epochs = 20
+
+
 def create_model(amount_time_steps, amount_classes):
     distributed_1d_conv1 = tf.keras.layers.TimeDistributed(tf.keras.layers.Conv1D(activation='relu', kernel_size=4,
                                                                                   filters=4),
@@ -39,8 +48,8 @@ def create_model(amount_time_steps, amount_classes):
                              return_sequences=False)
 
     net = tf.keras.Sequential()
-    #net.add(distributed_1d_conv1)
-    #net.add(distributed_1d_pool1)
+    # net.add(distributed_1d_conv1)
+    # net.add(distributed_1d_pool1)
     net.add(distributed_1d_conv2)
     net.add(distributed_1d_pool2)
     net.add(distributed_flatten)
@@ -48,8 +57,8 @@ def create_model(amount_time_steps, amount_classes):
     net.add(lstm_layer2)
     net.add(lstm_layer3)
     net.add(tf.keras.layers.Dense(units=amount_classes, activation='softmax'))
-    #net.build()
-    #net.summary()
+    # net.build()
+    # net.summary()
     try:
         net.compile(optimizer='Adam',
                     loss='categorical_crossentropy',
@@ -58,6 +67,7 @@ def create_model(amount_time_steps, amount_classes):
         print(e)
 
     return net
+
 
 def data_generator(batchsize, db, amount_epochs, mode='train', random=False,
                    use_seed=True, seed=5):
@@ -119,8 +129,6 @@ class SaveBestAcc(tf.keras.callbacks.Callback):
 
 
 fit_res = None
-batch_size = 8
-epochs = 20
 
 try:
     all_classes = os.listdir('../sign_db_front_view')
@@ -157,7 +165,7 @@ try:
 
         save_best_acc = SaveBestAcc()
         fit_res = net.fit(db, epochs=epochs, verbose=0)
-        #res = net.predict(db, steps=160*len(curr_classes) // batch_size)
+        # res = net.predict(db, steps=160*len(curr_classes) // batch_size)
         c_df = pd.DataFrame(dict(
             classes=[' - '.join(curr_classes)],
             var_acc=[np.var(fit_res.history['accuracy'])],
@@ -213,7 +221,7 @@ try:
 
         save_best_acc = SaveBestAcc()
         fit_res = net.fit(db, epochs=epochs, verbose=0)
-        #res = net.predict(db, steps=160*len(curr_classes) // batch_size)
+        # res = net.predict(db, steps=160*len(curr_classes) // batch_size)
         c_df = pd.DataFrame(dict(
             classes=[' - '.join(curr_classes)],
             var_acc=[np.var(fit_res.history['accuracy'])],
@@ -233,27 +241,148 @@ except BaseException as e:
     raise e
 
 # %%
-# class BaseClassifierCLI:
-#
-#     def __init__(self, arg_map=None):
-#         self.parser = argparse.ArgumentParser()
-#
-#     def fit(self):
-#         pass
-#
-#     def predict(self):
-#         pass
-#
-#     def base_args_map(self):
-#         pass
-#
-# class SimpleTFLSTMCLI:
-#     pass
+early_stopper = tf.keras.callbacks.EarlyStopping(
+    monitor="val_loss",
+    min_delta=0,
+    patience=5,
+    verbose=0,
+    mode="auto",
+    baseline=None,
+    restore_best_weights=True,
+)
 
-# db = DBLoader2NPY('../sign_db_front_view', batch_size=batch_size,
-#                   custom_internal_dir='',
-#                   no_hands=False, angle_pose=False)
-# db.fill_samples_absent_frames_with_na()
-#
-# max_len_seq = db.find_longest_sample()
-# amount_joints_used = len(db.joints_used()) - 1
+# %%
+batch_size = 16
+epochs = 120
+
+joints_to_use = ['frame',
+                 'Neck-RShoulder-RElbow',
+                 'RShoulder-RElbow-RWrist',
+                 'Neck-LShoulder-LElbow',
+                 'LShoulder-LElbow-LWrist',
+                 'RShoulder-Neck-LShoulder',
+                 'left-Wrist-left-ThumbProximal-left-ThumbDistal',
+                 'right-Wrist-right-ThumbProximal-right-ThumbDistal',
+                 'left-Wrist-left-IndexFingerProximal-left-IndexFingerDistal',
+                 'right-Wrist-right-IndexFingerProximal-right-IndexFingerDistal',
+                 'left-Wrist-left-MiddleFingerProximal-left-MiddleFingerDistal',
+                 'right-Wrist-right-MiddleFingerProximal-right-MiddleFingerDistal',
+                 'left-Wrist-left-RingFingerProximal-left-RingFingerDistal',
+                 'right-Wrist-right-RingFingerProximal-right-RingFingerDistal',
+                 'left-Wrist-left-LittleFingerProximal-left-LittleFingerDistal',
+                 'right-Wrist-right-LittleFingerProximal-right-LittleFingerDistal'
+                 ]
+
+db = DBLoader2NPY('../clean_sign_db_front_view', batch_size=batch_size,
+                  shuffle=True, test_size=.25,
+                  # add_angle_derivatives=True,
+                  #only_that_classes=['HOMEM', 'PORQUE'],
+                  no_hands=False, angle_pose=True, joints_2_use=joints_to_use)
+db.fill_samples_absent_frames_with_na()
+
+max_len_seq = db.find_longest_sample()
+amount_joints_used = len(db.joints_used()) - 1
+
+best_accs = []
+
+# %%
+for _ in range(1):
+    lstm_layer = \
+        tf.keras.layers.LSTM(units=30, activation='tanh',
+                             return_sequences=True,
+                             dropout=0.25, recurrent_dropout=0.25,
+                             input_shape=(max_len_seq, amount_joints_used)
+                             )
+
+    lstm_layer2 = \
+        tf.keras.layers.LSTM(units=15, activation='tanh',
+                             return_sequences=False)
+
+    lstm_layer3 = \
+        tf.keras.layers.LSTM(units=15, activation='tanh',
+                             return_sequences=False)
+
+    net = tf.keras.Sequential()
+    net.add(lstm_layer)
+    # net.add(tf.keras.layers.TimeDistributed(tf.keras.layers.Dropout(rate=0.2)))
+    # net.add(tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(units=30)))
+    net.add(lstm_layer2)
+    # net.add(lstm_layer3)
+    # net.add(tf.keras.layers.Dense(units=40, activation='sigmoid'))
+    # net.add(tf.keras.layers.Dropout(rate=0.3))
+    net.add(tf.keras.layers.Dense(units=4, activation='softmax'))
+    try:
+        net.compile(optimizer='Adam',
+                    loss='categorical_crossentropy',
+
+                    metrics=['accuracy'])
+    except ValueError as e:
+        print(e)
+
+    fit_res = net.fit(db.train(), epochs=epochs, verbose=0, shuffle=False, workers=0,
+                      callbacks=[early_stopper],
+                      validation_data=db.validation())
+    print(dict(var_acc=[np.var(fit_res.history['accuracy'])],
+               mean_acc=[np.mean(fit_res.history['accuracy'])],
+               mean_acc_val=[np.mean(fit_res.history['val_accuracy'])],
+               best_acc_val=[np.max(fit_res.history['val_accuracy'])],
+               best_acc=[np.max(fit_res.history['accuracy'])],
+               best_acc_val_epoch=[np.argmax(fit_res.history['val_accuracy'])],
+               best_acc_epoch=[np.argmax(fit_res.history['accuracy'])]))
+    best_accs.append(np.max(fit_res.history['accuracy']))
+
+    plt.figure(0, dpi=720/9, figsize=(16, 9))
+    plt.title('Accuracy')
+    plt.axhline(y=0.99, linestyle='-.')
+    plt.axhline(y=0.90, linestyle='--')
+    plt.axhline(y=0.80, linestyle='--')
+    plt.axhline(y=0.70, linestyle='--')
+    plt.axhline(y=0.60, linestyle='--')
+    plt.plot(np.arange(len(fit_res.history['val_accuracy'])), fit_res.history['val_accuracy'], label='val_accuracy')
+    plt.scatter(np.arange(len(fit_res.history['val_accuracy'])), fit_res.history['val_accuracy'], label='val_accuracy')
+    plt.plot(np.arange(len(fit_res.history['val_accuracy'])), fit_res.history['accuracy'], label='accuracy')
+    plt.scatter(np.arange(len(fit_res.history['val_accuracy'])), fit_res.history['accuracy'], label='accuracy')
+
+    plt.legend()
+    plt.show()
+
+    plt.figure(0, dpi=720/9, figsize=(16, 9))
+    plt.title('Loss')
+    plt.plot(np.arange(len(fit_res.history['val_accuracy'])), fit_res.history['val_loss'], label='val_loss')
+    plt.scatter(np.arange(len(fit_res.history['val_accuracy'])), fit_res.history['val_loss'])
+    plt.plot(np.arange(len(fit_res.history['val_accuracy'])), fit_res.history['loss'], label='loss')
+    plt.scatter(np.arange(len(fit_res.history['val_accuracy'])), fit_res.history['loss'])
+    plt.legend()
+    plt.show()
+
+# %%
+svc_clf = SVC(kernel='rbf', probability=True)
+X = []
+y = []
+
+for it, x in enumerate(db.train()):
+    X.extend(x[0])
+    y.extend(x[1])
+
+x_val = []
+y_val = []
+
+for it, x in enumerate(db.validation()):
+    x_val.extend(x[0])
+    y_val.extend(x[1])
+
+X = np.stack([x.reshape((1, -1)) for x in X])
+X = X.reshape((X.shape[0], 735))
+y = np.array([np.argmax(x) for x in np.stack(y)]).reshape((-1, 1)).reshape((-1))
+
+x_val = np.stack([x.reshape((1, -1)) for x in x_val])
+x_val = x_val.reshape((x_val.shape[0], 735))
+y_val = np.array([np.argmax(x) for x in np.stack(y_val)]).reshape((-1, 1)).reshape((-1))
+
+clf_list = [KNeighborsClassifier(n_neighbors=5), AdaBoostClassifier(), RandomForestClassifier(), DecisionTreeClassifier(),
+            SVC(kernel='rbf', probability=True)]
+for clf in clf_list:
+    clf.fit(X=X, y=y)
+    y_pred = clf.predict(x_val)
+    print(clf, accuracy_score(y_val, y_pred))
+
