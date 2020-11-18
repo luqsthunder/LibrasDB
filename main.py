@@ -3,10 +3,9 @@ from libras_classifiers.librasdb_loaders import DBLoader2NPY
 import pandas as pd
 import numpy as np
 import cv2 as cv
-import os
 
-left_front_data = pd.read_csv('v1098_barely_front_view_left_person.csv')
-left_side_data = pd.read_csv('v0180_side_view_left_person.csv')
+left_front_data = pd.read_csv('v1098_barely_front_view_right_person.csv')
+left_side_data = pd.read_csv('v0180_side_view_right_person.csv')
 
 left_front_data = left_front_data.applymap(DBLoader2NPY.parse_npy_vec_str)
 left_side_data = left_side_data.applymap(DBLoader2NPY.parse_npy_vec_str)
@@ -59,36 +58,24 @@ if len(matches) >= 16:
     projection2[:3, :3] = R
     projection2[:, 3:] = t
 
-    inliers_pts1 = []
-    inliers_pts2 = []
-    for it in range(inliers.shape[0]):
-        if inliers[it] != 0:
-            inliers_pts1.append(matches[it][0].tolist())
-            inliers_pts2.append(matches[it][1].tolist())
-
-    points1u = cv.undistortPoints(np.array(inliers_pts1), cameraMatrix=camera_mat, distCoeffs=None, R=R)
-    points2u = cv.undistortPoints(np.array(inliers_pts2), cameraMatrix=camera_mat, distCoeffs=None, R=R)
-
     for frame in all_frames:
         row_front = left_front_data[left_front_data['frame'] == frame]
-        row_front = row_front[all_joints_to_use].values[0]
-        row_front = [x if x[2] >= threshold else None for x in row_front]
+        #row_front = row_front[all_joints_to_use].values[0]
+        row_front = [(x[1].values[0] if x[1].values[0][2] >= threshold else None, x[0]) 
+                     for x in row_front.iteritems() if not isinstance(x[0], float) and x[0] not in ['frame', 'Unnamed: 0']]
 
         row_side = left_side_data[left_side_data['frame'] == frame]
-        row_side = row_side[all_joints_to_use].values[0]
-        row_side = [x if x[2] >= threshold else None for x in row_side]
+        row_side = [(x[1].values[0] if x[1].values[0][2] >= threshold else None, x[0])
+                    for x in row_side.iteritems() if not isinstance(x[0], float) and x[0] not in ['frame', 'Unnamed: 0']]
 
         matches = []
         for front, side in zip(row_front, row_side):
-            if front is not None and side is not None:
-                matches.append((front[:2], side[:2]))
-
-        points3d = cv.triangulatePoints(projection1, projection2,
-                                        np.array([x[0].tolist() for x in matches]).reshape(len(matches), 1, 2),
-                                        np.array([x[1].tolist() for x in matches]).reshape(len(matches), 1, 2))
-
-        cv.v
+            if front[0] is not None and side[0] is not None:
+                #matches.append((front[0][:2], side[0][:2]))
+                points3d = cv.triangulatePoints(projection1, projection2,
+                                                np.array([front[0]]).reshape(len(matches), 1, 2),
+                                                np.array([side[0]]).reshape(len(matches), 1, 2))
+        
 
 # cv::findEssentialMat (InputArray points1, InputArray points2, double focal=1.0, Point2d pp=Point2d(0, 0),
 #                       int method=RANSAC, double prob=0.999, double threshold=1.0, OutputArray mask=noArray())
-
