@@ -112,58 +112,58 @@ for it in range(len(all_videos_in_folder)):
 
 
 # %%
-# all_left_whites_count = []
-# all_lefts = {'Left': 0, 'Right': 0}
-# faces = None
-# for curr_hole_pos in tqdm(range(len(signer_1_holes))):
-#     # curr_hole_pos =
-#     fps = int(all_videos_in_folder[0].get(cv.CAP_PROP_FPS))
-#     beg_frame_time = signer_1_holes[curr_hole_pos]['beg']
-#     res = all_videos_in_folder[0].set(cv.CAP_PROP_POS_MSEC, beg_frame_time)
-#     end_frame_time = signer_1_holes[curr_hole_pos]['end']
-#
-#     last_frame = None
-#     key = None
-#
-#     ret, frame = all_videos_in_folder[0].read()
-#     frame = cv.cvtColor(frame, cv.COLOR_BGR2GRAY)
-#     curr_video_pos_msec = all_videos_in_folder[0].get(cv.CAP_PROP_POS_MSEC)
-#     last_msec = curr_video_pos_msec
-#
-#     if faces is None:
-#         faces = face_recognition.face_locations(frame)
-#         break
-#
-#     left_most_white = []
-#     while curr_video_pos_msec <= end_frame_time:
-#
-#         (thresh, frame) = cv.threshold(frame, 127, 255, cv.THRESH_BINARY)
-#         curr_frame = frame - last_frame if last_frame is not None else frame
-#         last_frame = frame
-#         (thresh, curr_frame) = cv.threshold(curr_frame, 127, 255, cv.THRESH_BINARY)
-#
-#         left = curr_frame[:, :curr_frame.shape[1] // 2]
-#         right = curr_frame[:, curr_frame.shape[1] // 2:]
-#
-#         left_most_white.append(np.count_nonzero(left > 1) < np.count_nonzero(right > 1))
-#
-#         # cv.imshow('window', cv.vconcat([curr_frame, frame]))
-#         # key = cv.waitKey(fps)
-#         # if key == 27:  # exit on ESC
-#         #     break
-#
-#         ret, frame = all_videos_in_folder[0].read()
-#         frame = cv.cvtColor(frame, cv.COLOR_BGR2GRAY)
-#         curr_video_pos_msec = all_videos_in_folder[0].get(cv.CAP_PROP_POS_MSEC)
-#         last_msec = curr_video_pos_msec
-#
-#     unique, counts = np.unique(np.array(left_most_white), return_counts=True)
-#     count_whites = dict(zip(unique, counts))
-#     all_lefts['Left'] += count_whites[True] if True in count_whites else 0
-#
-#     all_lefts['Right'] += count_whites[False] if False in count_whites else 0
-#
-#     all_left_whites_count.append(count_whites)
+all_left_whites_count = []
+all_lefts = {'Left': 0, 'Right': 0}
+faces = None
+for curr_hole_pos in tqdm(range(len(signer_1_holes))):
+    # curr_hole_pos =
+    fps = int(all_videos_in_folder[0].get(cv.CAP_PROP_FPS))
+    beg_frame_time = signer_1_holes[curr_hole_pos]['beg']
+    res = all_videos_in_folder[0].set(cv.CAP_PROP_POS_MSEC, beg_frame_time)
+    end_frame_time = signer_1_holes[curr_hole_pos]['end']
+
+    last_frame = None
+    key = None
+
+    ret, frame = all_videos_in_folder[0].read()
+    frame = cv.cvtColor(frame, cv.COLOR_BGR2GRAY)
+    curr_video_pos_msec = all_videos_in_folder[0].get(cv.CAP_PROP_POS_MSEC)
+    last_msec = curr_video_pos_msec
+
+    if faces is None:
+        faces = face_recognition.face_locations(frame)
+        break
+
+    left_most_white = []
+    while curr_video_pos_msec <= end_frame_time:
+
+        (thresh, frame) = cv.threshold(frame, 127, 255, cv.THRESH_BINARY)
+        curr_frame = frame - last_frame if last_frame is not None else frame
+        last_frame = frame
+        (thresh, curr_frame) = cv.threshold(curr_frame, 127, 255, cv.THRESH_BINARY)
+
+        left = curr_frame[:, :curr_frame.shape[1] // 2]
+        right = curr_frame[:, curr_frame.shape[1] // 2:]
+
+        left_most_white.append(np.count_nonzero(left > 1) < np.count_nonzero(right > 1))
+
+        cv.imshow('window', cv.vconcat([curr_frame, frame]))
+        key = cv.waitKey(fps)
+        if key == 27:  # exit on ESC
+            break
+
+        ret, frame = all_videos_in_folder[0].read()
+        frame = cv.cvtColor(frame, cv.COLOR_BGR2GRAY)
+        curr_video_pos_msec = all_videos_in_folder[0].get(cv.CAP_PROP_POS_MSEC)
+        last_msec = curr_video_pos_msec
+
+    unique, counts = np.unique(np.array(left_most_white), return_counts=True)
+    count_whites = dict(zip(unique, counts))
+    all_lefts['Left'] += count_whites[True] if True in count_whites else 0
+
+    all_lefts['Right'] += count_whites[False] if False in count_whites else 0
+
+    all_left_whites_count.append(count_whites)
 
 
 # %%
