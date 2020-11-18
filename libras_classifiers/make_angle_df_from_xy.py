@@ -94,6 +94,9 @@ def make_angle_df_from_xy(sample: pd.DataFrame, no_hands=False, pbar: tqdm = Non
 
         """
         angle = None
+        if isinstance(r[parts[0]], float) or isinstance(r[parts[1]], float) or isinstance(r[parts[1]], float):
+            return None
+
         if (not ((0 in r[parts[0]]) or r[parts[0]] is None or any(np.isnan(r[parts[0]])) )) and \
            (not ((0 in r[parts[1]]) or r[parts[1]] is None or any(np.isnan(r[parts[1]])) )) and \
            (not ((0 in r[parts[2]]) or r[parts[2]] is None or any(np.isnan(r[parts[2]])) )):
@@ -136,7 +139,7 @@ def make_angle_df_from_xy(sample: pd.DataFrame, no_hands=False, pbar: tqdm = Non
 
         if pbar is not None:
             pbar.update(1)
-            pbar.refresh()
+            # pbar.refresh()
 
     return pose_angle_df
 
@@ -185,7 +188,7 @@ def convert_all_samples_xy_2_angle(db_path, no_hands=False, custom_dir=None):
 
         if os.path.exists(sample_path):
             folder_pbar.update(1)
-            folder_pbar.refresh()
+            # folder_pbar.refresh()
             continue
 
         folder_pbar.set_description(class_name)
@@ -196,7 +199,7 @@ def convert_all_samples_xy_2_angle(db_path, no_hands=False, custom_dir=None):
         sample_angle_df.to_csv(sample_path)
 
         folder_pbar.update(1)
-        folder_pbar.refresh()
+        # folder_pbar.refresh()
 
 
 def count_samples_in_database(db_path, no_hands=False, xy=True, custom_dir=None):
@@ -266,4 +269,4 @@ def yield_all_db_samples(db_path, no_hands=False, xy=True):
 
 if __name__ == '__main__':
     np.seterr(all='raise')
-    convert_all_samples_xy_2_angle('../sign_db_front_view', custom_dir='')
+    convert_all_samples_xy_2_angle('../clean_sign_db_front_view', custom_dir='')

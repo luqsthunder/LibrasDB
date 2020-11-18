@@ -9,7 +9,7 @@ class LibrasImageLoader(DBLoader2NPY):
     fornece-las como um generator para tf-keras (tensorflow 2 API do keras) e o keras (api antiga com tensorflow 1.14).
     """
 
-    def __init__(self, video_db_path, all_videos_csv_path, **kwargs)
+    def __init__(self, video_db_path, all_videos_csv_path, **kwargs):
         """
         Os kwargs são os mesmos da DBLoader2NPY, cheque o arquivo libras_classifier/librasdb_loaders.py para maiores
         detalhes.
@@ -25,6 +25,7 @@ class LibrasImageLoader(DBLoader2NPY):
         X, y = super().batch_load_sample(samples_idx, as_npu=False, clean_nan=False)
         for sample_id in samples_idx:
             pass
+
         return X, y
 
     def __getitem__(self, index):
