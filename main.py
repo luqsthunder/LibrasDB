@@ -85,6 +85,8 @@ if len(matches) >= 16:
                                                 front[0][:2].reshape(1, 1, 2),
                                                 side[0][:2].reshape(1, 1, 2))
                 dic[front[1]].append(points3d)
+            else:
+                dic[front[1]].append(None)
 
 # cv::findEssentialMat (InputArray points1, InputArray points2, double focal=1.0, Point2d pp=Point2d(0, 0),
 #                       int method=RANSAC, double prob=0.999, double threshold=1.0, OutputArray mask=noArray())
