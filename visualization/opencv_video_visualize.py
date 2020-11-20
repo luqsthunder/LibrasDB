@@ -23,7 +23,7 @@ class OcvVideoPlayer:
         self.vid_sync = read_csv_or_ret_df(vid_sync)
         self.all_persons_from_subtitle = read_csv_or_ret_df(all_persons_from_subtitle)
         self._all_samples_name, self.cls_dirs = DBLoader2NPY.read_all_db_folders(db_path=self.sign_db_path,
-                                                                                 only_that_classes=['TER'], #only_that_classes=['PORQUE', 'HOMEM', 'NÃO','COMO', 'TER'],#only_that_classes=None,
+                                                                                 only_that_classes=['TRABALHAR'], #only_that_classes=['PORQUE', 'HOMEM', 'NÃO','COMO', 'TER'],#only_that_classes=None,
                                                                                  angle_or_xy='xy-hands',
                                                                                  custom_internal_dir='')
         self.curr_sample_idx = 0
@@ -137,8 +137,9 @@ class OcvVideoPlayer:
         video_height = int(self.cap.get(cv.CAP_PROP_FRAME_HEIGHT))
         video_fps = int(self.cap.get(cv.CAP_PROP_FPS))
 
-        vid_path = '../vid-folder/HOMEM/' + curr_opts['name'] + '.mp4'
-        if os.path.exists(vid_path):
+        vid_path = f'../vid-folder/{curr_opts["sign"]}/' + curr_opts['name'] + '.mp4'
+        seen_vid_path = f'../vid-folder/{curr_opts["sign"]}/seen/' + curr_opts['name'] + '.mp4'
+        if os.path.exists(seen_vid_path):
             return True
 
         vid_save = cv.VideoWriter(vid_path, fourcc, video_fps, (video_width, video_height))

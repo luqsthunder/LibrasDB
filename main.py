@@ -63,24 +63,21 @@ if len(matches) >= 16:
         k: [] for k in left_front_data.keys()
     }
 
+    def clean_row(data_to_clean, curr_frame) -> list:
+        row = data_to_clean[data_to_clean['frame'] == curr_frame]
+        row = row.drop(columns=['frame', 'Unnamed: 0'])
+        row = row.applymap(lambda x: np.array([0.0, 0.0, 0.0]) if isinstance(x, float) else x)
+        row = [(x.values[0] if x.values[0][2] >= threshold else None, key)
+                     for key, x in row.iteritems()]
+        return row
+
     for frame in tqdm(all_frames):
-        row_front = left_front_data[left_front_data['frame'] == frame]
-        row_front = row_front.drop(columns=['frame', 'Unnamed: 0'])
-        row_front = row_front.applymap(lambda x: np.array([0.0, 0.0, 0.0]) if isinstance(x, float) else x)
-        row_front = [(x.values[0] if x.values[0][2] >= threshold else None, key)
-                     for key, x in row_front.iteritems()]
+        row_front = clean_row(left_front_data[left_front_data['frame'] == frame], frame)
+        row_side = clean_row(left_side_data[left_side_data['frame'] == frame], frame)
 
-        row_side = left_side_data[left_side_data['frame'] == frame]
-        row_side = row_side.drop(columns=['frame', 'Unnamed: 0'])
-        row_side = row_side.applymap(lambda x: np.array([0.0, 0.0, 0.0]) if isinstance(x, float) else x)
-        row_side = [(x.values[0] if x.values[0][2] >= threshold else None, key)
-                    for key, x in row_side.iteritems()]
-
-        matches = []
         dic['frame'].append(frame)
         for front, side in zip(row_front, row_side):
             if front[0] is not None and side[0] is not None:
-                #matches.append((front[0][:2], side[0][:2]))
                 points3d = cv.triangulatePoints(projection1, projection2,
                                                 front[0][:2].reshape(1, 1, 2),
                                                 side[0][:2].reshape(1, 1, 2))

@@ -63,7 +63,7 @@ class ExtractMultipleVideos:
         """
 
         all_v_parts = self.vid_sync.v_part.unique().tolist()
-        for v_part in tqdm(all_v_parts, position=1):
+        for v_part in tqdm(all_v_parts, position=3, desc="all folders"):
             if v_part == -1:
                 continue
 
@@ -109,7 +109,7 @@ class ExtractMultipleVideos:
 
         all_signs_pose_df = []
         for sign_row in tqdm(signs_in_folder.iterrows(), desc='single_folder', total=signs_in_folder.shape[0],
-                             position=0):
+                             position=1):
             sign_row = sign_row[1]
 
             folder_path = os.path.join(self.path_to_save_dfs, sign_row.sign)
@@ -279,6 +279,7 @@ class ExtractMultipleVideos:
         if enable_debug and cv_debug:
             cv.destroyAllWindows()
 
+        vid.release()
         return video_df
 
     def __read_vid_path_from_vpart(self, v_part: int, vid_number: int):
@@ -467,15 +468,23 @@ class ExtractMultipleVideos:
 if __name__ == '__main__':
     sign_list = [
         # 'NÃO', 'TER', 'BOM', 'E(esperar)','COMO', 'E(acabar)', 'VER', 'HOMEM', 'PORQUE', 'ESTUDAR'
-        'TER'
+        'VER'
         # 'HOMEM'
+    ]
+
+    new_sign_list = [
+        'TRABALHAR',
+        # 'SABER',
+        # 'CERTO',
+        # 'OUVIR',
+        # 'MÃE',
     ]
     extractMultipleVideos = ExtractMultipleVideos(db_path='D:/gdrive',
                                                   all_videos='all_videos.csv',
                                                   openpose_path='C:/Users/usuario/Documents/Libraries/repos/openpose',
                                                   vid_sync='vid_sync.csv',
                                                   path_to_save_dfs='../sign_db_front_view',
-                                                  needed_signs_list=sign_list,
+                                                  needed_signs_list=new_sign_list,
                                                   all_persons_subtitle='all_persons_from_subtitle.csv')
 
     # extractMultipleVideos.unittest_for___extract_siun
