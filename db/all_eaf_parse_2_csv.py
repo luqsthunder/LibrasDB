@@ -79,7 +79,7 @@ class AllEAFParser2CSV:
         res = [f.result() for f in futures]
         return res
 
-    def process(self, pbar=None, pbar_dup=None, path_to_save_sign_df='./'):
+    def process(self, pbar=None, pbar_dup=None, path_to_save_sign_df='./', check_n_remove_dups=True):
         """
         Funcao principal que processa todas as legendas.
 
@@ -152,33 +152,48 @@ class AllEAFParser2CSV:
         # Nessa etapa abaixo removemos as duplicidades pois não é interessante
         # saber ja que vamos extrair o esqueleto posteriormente.
         row_2_drop = []
-        path_2_dup_all_videos = os.path.join(path_to_save_sign_df,
-                                             '../dupl-all_videos.csv')
-        libras_df.to_csv(path_2_dup_all_videos, index=False)
+        libras_corpus_index_string = libras_df.folder_name.iloc[0].replace('\\', '/').split('/')
+        libras_corpus_index_string = libras_corpus_index_string.index('LibrasCorpus')
 
-        if pbar_dup is not None:
-            pbar_dup.reset(total=libras_df.shape[0])
-            pbar_dup.set_description('dups')
-        for it, row in enumerate(libras_df.iterrows()):
-            row = row[1]
-            res = libras_df.loc[(libras_df['beg'] == row['beg']) &
-                                (libras_df['end'] == row['end']) &
-                                (libras_df['talker_id'] == row['talker_id']) &
-                                (libras_df['folder_name'] == row['folder_name']) &
-                                (libras_df['sign'] == row['sign'])]
-            if res.shape[0] > 1:
-                libras_df.loc[it, 'hand'] = 2
-                row_2_drop.append(res.index)
-            else:
-                libras_df.loc[it, 'hand'] = 1
+        libras_df.folder_name = \
+            libras_df.folder_name.map(
+                lambda x: os.path.join(*(x.replace('\\', '/').split('/')[libras_corpus_index_string:])))
+
+        libras_df.folder = \
+            libras_df.folder.map(
+                lambda x: os.path.join(*(x.replace('\\', '/').split('/')[libras_corpus_index_string:])))
+
+        libras_df.estate = \
+            libras_df.estate.map(
+                lambda x: os.path.join(*(x.replace('\\', '/').split('/')[libras_corpus_index_string + 1:])))
+
+        if check_n_remove_dups:
+            path_2_dup_all_videos = os.path.join(path_to_save_sign_df,
+                                                 '../dupl-all_videos.csv')
+            libras_df.to_csv(path_2_dup_all_videos, index=False)
 
             if pbar_dup is not None:
-                pbar_dup.update(1)
-                pbar_dup.refresh()
+                pbar_dup.reset(total=libras_df.shape[0])
+                pbar_dup.set_description('dups')
+            for it, row in enumerate(libras_df.iterrows()):
+                row = row[1]
+                res = libras_df.loc[(libras_df['beg'] == row['beg']) &
+                                    (libras_df['end'] == row['end']) &
+                                    (libras_df['talker_id'] == row['talker_id']) &
+                                    (libras_df['folder_name'] == row['folder_name']) &
+                                    (libras_df['sign'] == row['sign'])]
+                if res.shape[0] > 1:
+                    libras_df.loc[it, 'hand'] = 2
+                    row_2_drop.append(res.index)
+                else:
+                    libras_df.loc[it, 'hand'] = 1
 
-        single_list_drop = list(map(lambda x: x[1], row_2_drop))
-        single_list_drop = list(set(single_list_drop))
-        libras_df = libras_df.drop(single_list_drop)
+                if pbar_dup is not None:
+                    pbar_dup.update(1)
+
+            single_list_drop = list(map(lambda x: x[1], row_2_drop))
+            single_list_drop = list(set(single_list_drop))
+            libras_df = libras_df.drop(single_list_drop)
 
         path_2_all_videos = os.path.join(path_to_save_sign_df, '../all_videos.csv')
         libras_df.to_csv(path_2_all_videos, index=False)
@@ -428,7 +443,7 @@ class AllEAFParser2CSV:
 
 
 if __name__ == '__main__':
-    db_cut_videos = AllEAFParser2CSV('D:/gdrive/LibrasCorpus')
-    db_cut_videos.process(path_to_save_sign_df='./')
+    db_cut_videos = AllEAFParser2CSV('/media/usuario/Others/gdrive/LibrasCorpus')
+    db_cut_videos.process(path_to_save_sign_df='./', check_n_remove_dups=False)
     print(db_cut_videos.bad_subs, file=open('bad_subs.txt', mode='w'))
     print(db_cut_videos.bad_videos, file=open('bad_videos.txt', mode='w'))

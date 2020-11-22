@@ -3,6 +3,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 from tqdm import tqdm
+import os
 from PIL import ImageFont, ImageDraw, Image
 import matplotlib.ticker as ticker
 import cv2 as cv
@@ -187,3 +188,19 @@ for sample in tqdm(more_than_30_samples):
 
 final_video.release()
 
+# %%
+libras_corpus_index_string = sign_db.folder_name.iloc[0].replace('\\', '/').split('/')
+libras_corpus_index_string = libras_corpus_index_string.index('LibrasCorpus')
+sign_db.folder_name = \
+    sign_db.folder_name.map(lambda x: os.path.join(*(x.replace('\\', '/').split('/')[libras_corpus_index_string:])))
+
+sign_db.folder = \
+    sign_db.folder.map(lambda x: os.path.join(*(x.replace('\\', '/').split('/')[libras_corpus_index_string:])))
+
+sign_db.estate = \
+    sign_db.estate.map(lambda x: os.path.join(*(x.replace('\\', '/').split('/')[libras_corpus_index_string + 1:])))
+
+
+# %%
+
+all_folders = sign_db.folder_name.unique().tolist()
