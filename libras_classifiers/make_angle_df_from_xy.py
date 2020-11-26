@@ -212,7 +212,9 @@ def count_samples_in_database(db_path, no_hands=False, xy=True, custom_dir=None)
 
     for sample_dir in os.listdir(db_path):
         sample_dir = os.path.join(db_path, sample_dir, dir_before_samples_name)
-        amount_samples += len(os.listdir(sample_dir))
+        samples_at_dir = list(filter(lambda x: '.csv' in x, os.listdir(sample_dir)))
+
+        amount_samples += len(samples_at_dir)
 
     return amount_samples
 

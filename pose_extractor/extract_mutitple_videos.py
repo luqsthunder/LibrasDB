@@ -487,6 +487,6 @@ if __name__ == '__main__':
                                                   needed_signs_list=new_sign_list,
                                                   all_persons_subtitle='all_persons_from_subtitle.csv')
 
-    # extractMultipleVideos.unittest_for___extract_siun
-    extractMultipleVideos.process()
+    extractMultipleVideos.unittest_for___extract_sign_from_video_with_2_person()
+    # extractMultipleVideos.process()
     # 217 sinais da palavra homem extraidos.
