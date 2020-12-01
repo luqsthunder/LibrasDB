@@ -2,6 +2,7 @@ import os
 import math
 import numpy as np
 import pandas as pd
+import tensorflow as tf
 from tensorflow.keras.utils import Sequence
 from tqdm.auto import tqdm
 from pose_extractor.all_parts import *
@@ -595,7 +596,7 @@ class InternalBaseKerasIterator(Sequence):
 
         x, y = self.parent.batch_load_samples(self.ids[beg: end])
 
-        return x, y, [None]
+        return x, y #[None] if tf.__version__.split('.')[1] == 1 else x, y
 
     def __len__(self):
         return math.ceil(len(self.ids) / self.parent.batch_size)
