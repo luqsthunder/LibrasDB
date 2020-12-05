@@ -271,4 +271,4 @@ def yield_all_db_samples(db_path, no_hands=False, xy=True):
 
 if __name__ == '__main__':
     np.seterr(all='raise')
-    convert_all_samples_xy_2_angle('../clean_sign_db_front_view', custom_dir='')
+    convert_all_samples_xy_2_angle('/home/usuario/Documents/clean_sign_db_front_view', custom_dir='')
