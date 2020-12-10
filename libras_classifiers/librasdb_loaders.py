@@ -561,7 +561,7 @@ class DBLoader2NPY(Sequence):
         end = np.min([(index + 1) * self.batch_size, self.db_length()])
 
         x, y = self.batch_load_samples(self.x[beg: end])
-        return x, y#, [None]
+        return x, y, [None]
 
     def __len__(self):
         """
