@@ -1,0 +1,13 @@
+name: dl-poses
+channels:
+  - conda-forge
+  - defaults
+
+dependencies:
+  - python=3.7
+  - matplotlib
+  # Core scientific python
+  - numpy
+  - scikit-learn
+  - tensorflow-gpu
+  - opencv
