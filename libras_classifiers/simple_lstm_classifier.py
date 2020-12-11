@@ -43,7 +43,7 @@ joints_to_use = ['frame',
 db = DBLoader2NPY('../clean_sign_db_front_view',
                   batch_size=batch_size,
                   shuffle=True, test_size=.25,
-                  add_angle_derivatives=True,
+                  add_derivatives=True,
                   no_hands=False,
                   angle_pose=True,
                   joints_2_use=joints_to_use
@@ -53,7 +53,7 @@ db.fill_samples_absent_frames_with_na()
 db_no_dt = DBLoader2NPY('../clean_sign_db_front_view',
                         batch_size=batch_size,
                         shuffle=True, test_size=.25,
-                        add_angle_derivatives=True,
+                        add_derivatives=True,
                         no_hands=False,
                         angle_pose=True,
                         joints_2_use=joints_to_use
@@ -64,11 +64,22 @@ db_xy = DBLoader2NPY('../clean_sign_db_front_view',
                      batch_size=batch_size,
                      shuffle=True, test_size=.25,
                      scaler_cls=StandardScaler,
+                     add_derivatives=True,
                      custom_internal_dir='',
                      no_hands=False,
                      angle_pose=False,
                      )
 db_xy.fill_samples_absent_frames_with_na()
+
+db_no_dt_xy = DBLoader2NPY('../clean_sign_db_front_view',
+                           batch_size=batch_size,
+                           shuffle=True, test_size=.25,
+                           scaler_cls=StandardScaler,
+                           custom_internal_dir='',
+                           no_hands=False,
+                           angle_pose=False,
+                           )
+db_no_dt_xy.fill_samples_absent_frames_with_na()
 
 
 # %%
@@ -174,11 +185,12 @@ def train_angle_lstm(pose, amount_lstm, lstm_1_units, lstm_2_units, lstm_3_units
 
 
 def train_lstm_xy_pose(pose, amount_lstm, lstm_1_units, lstm_2_units, lstm_3_units, dropout, dropout_recurrent,
-                       dense_units):
+                       dense_units, use_derivatives=False):
     epochs = 1000
 
-    max_len_seq = db_xy.find_longest_sample()
-    amount_joints_used = len(db_xy.joints_used()) - 1
+    db_used = db_xy if use_derivatives else db_no_dt_xy
+    max_len_seq = db_used.find_longest_sample()
+    amount_joints_used = len(db_used.joints_used()) - 1
 
     net = tf.keras.Sequential()
 
@@ -187,17 +199,18 @@ def train_lstm_xy_pose(pose, amount_lstm, lstm_1_units, lstm_2_units, lstm_3_uni
     if dense_units is not None:
         net.add(tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(units=dense_units, activation='tanh')))
 
-    return make_base_classifier(net, pose_db=db_xy, pose=pose, amount_lstm=amount_lstm, lstm_1_units=lstm_1_units,
+    return make_base_classifier(net, pose_db=db_used, pose=pose, amount_lstm=amount_lstm, lstm_1_units=lstm_1_units,
                                 lstm_2_units=lstm_2_units, lstm_3_units=lstm_3_units, dropout=dropout,
                                 dense_units=dense_units, dropout_recurrent=dropout_recurrent, epochs=epochs)
 
 
 def train_lstm_xy_pose_cnn(pose, amount_lstm, lstm_1_units, lstm_2_units, lstm_3_units, dropout, dropout_recurrent,
-                           cnn_1_filters, cnn_2_filters, cnn_kernel):
+                           cnn_1_filters, cnn_2_filters, cnn_kernel, use_derivatives=False):
     epochs = 1000
 
-    max_len_seq = db_xy.find_longest_sample()
-    amount_joints_used = len(db_xy.joints_used()) - 1
+    db_used = db_xy if use_derivatives else db_no_dt_xy
+    max_len_seq = db_used.find_longest_sample()
+    amount_joints_used = len(db_used.joints_used()) - 1
 
     net = tf.keras.Sequential()
 
@@ -212,7 +225,7 @@ def train_lstm_xy_pose_cnn(pose, amount_lstm, lstm_1_units, lstm_2_units, lstm_3
     net.add(tf.keras.layers.TimeDistributed(tf.keras.layers.MaxPool1D()))
     net.add(tf.keras.layers.TimeDistributed(tf.keras.layers.Flatten()))
 
-    return make_base_classifier(net, pose_db=db_xy, pose=pose, amount_lstm=amount_lstm, lstm_1_units=lstm_1_units,
+    return make_base_classifier(net, pose_db=db_used, pose=pose, amount_lstm=amount_lstm, lstm_1_units=lstm_1_units,
                                 lstm_2_units=lstm_2_units, lstm_3_units=lstm_3_units, dropout=dropout,
                                 dense_units=None, dropout_recurrent=dropout_recurrent, epochs=epochs,
                                 cnn_kernel=cnn_kernel, cnn_1_filters=cnn_1_filters, cnn_2_filters=cnn_2_filters)
@@ -320,7 +333,6 @@ csv_angle_name = 'all_experiments_pose_angle_no_dense_no_derivatives_batch1.csv'
 df_exp = pd.read_csv(exp_path + csv_angle_name) if os.path.exists(exp_path + csv_angle_name) else pd.DataFrame()
 save_header = df_exp.shape[0] == 0
 for param in tqdm(all_params_product):
-    print(param)
     if df_exp.shape[0] != 0:
         if str(param) in df_exp.exp_name.unique().tolist():
             continue
@@ -372,7 +384,6 @@ for param in tqdm(all_params_product):
         if str(param) in df_exp.exp_name.unique().tolist():
             continue
 
-    print(param)
     tf.keras.backend.clear_session()
     try:
         acc_pdf_file, loss_pdf_file, history = train_lstm_xy_pose('xy-pose',dense_units=None, **param)
@@ -443,6 +454,7 @@ for param in tqdm(all_params_product):
     )).to_csv(exp_path + csv_xy_cnn_name, mode='a', header=save_header)
     save_header = False
 
+# %%
 #######################################################################################################################
 dt_pose = dict(
     cnn_1_filters=[16],
@@ -490,3 +502,5 @@ for param in tqdm(all_params_product):
         dropout_recurrent=[param['dropout_recurrent']],
     )).to_csv(exp_path + csv_xy_cnn_name, mode='a', header=save_header)
     save_header = False
+# %%
+

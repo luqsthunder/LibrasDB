@@ -9,18 +9,19 @@ class TestDBLoader2npy:
     BATCH_SIZE = 8
 
     def setup(self):
+        self.dbxy = DBLoader2NPY('../libras-db-folders-debug',
+                                 batch_size=self.BATCH_SIZE,
+                                 add_derivatives=True,
+                                 angle_pose=False,
+                                 no_hands=False)
+
         self.db = DBLoader2NPY('../libras-db-folders-debug',
                                angle_pose=True,
                                no_hands=False,
                                batch_size=self.BATCH_SIZE,
                                make_k_fold=True,
-                               add_angle_derivatives=True,
+                               add_derivatives=True,
                                k_fold_amount=5)
-
-        self.dbxy = DBLoader2NPY('../libras-db-folders-debug',
-                                 batch_size=self.BATCH_SIZE,
-                                 angle_pose=False,
-                                 no_hands=False)
 
         self.db_image = LibrasImageLoader('../libras-db-folders-debug',
                                           batch_size=self.BATCH_SIZE,

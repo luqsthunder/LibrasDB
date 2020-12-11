@@ -29,7 +29,7 @@ joints_to_use = ['frame',
 db = DBLoader2NPY('../../clean_sign_db_front_view',
                   batch_size=batch_size,
                   shuffle=True, test_size=.25,
-                  add_angle_derivatives=True,
+                  add_derivatives=True,
                   no_hands=False,
                   angle_pose=True,
                   joints_2_use=joints_to_use

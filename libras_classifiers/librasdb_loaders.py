@@ -20,7 +20,7 @@ class DBLoader2NPY(Sequence):
     """
 
     def __init__(self, db_path, batch_size, angle_pose=True, no_hands=True, joints_2_use=None,
-                 shuffle=False, test_size=0.3, add_angle_derivatives=False,
+                 shuffle=False, test_size=0.3, add_derivatives=False,
                  maintain_memory=True, make_k_fold=False, k_fold_amount=None, only_that_classes=None,
                  scaler_cls=None, not_use_pbar_in_load=False, custom_internal_dir=None, const_none_angle_rep=0,
                  const_none_xy_rep=np.array([0, 0, 0])):
@@ -64,7 +64,7 @@ class DBLoader2NPY(Sequence):
         self.batch_size = batch_size
         self.make_k_fold = make_k_fold; self.k_fold_amount = k_fold_amount
         self.joints_2_use = joints_2_use
-        self.add_angle_derivatives = add_angle_derivatives
+        self.add_derivatives = add_derivatives
         self.scaler_cls = scaler_cls
 
         angle_or_xy = 'angle' if angle_pose else 'xy'
@@ -88,7 +88,7 @@ class DBLoader2NPY(Sequence):
         self.longest_sample = self.find_longest_sample(no_pbar=not_use_pbar_in_load)
         self.weight_2_samples = None
 
-        if self.angle_pose and self.add_angle_derivatives and self.joints_2_use is not None:
+        if self.angle_pose and self.add_derivatives and self.joints_2_use is not None:
             self.joints_2_use = self.joints_2_use + [f'DP-DT-{x}' for x in self.joints_2_use if x != 'frame']
 
         self.k_fold_iteration = 0
@@ -333,8 +333,11 @@ class DBLoader2NPY(Sequence):
             if self.scaler_cls is not None and not self.angle_pose:
                 sample = DBLoader2NPY.scale_single_sample(sample, self.scaler_cls)
 
-            if self.add_angle_derivatives and self.angle_pose:
+            if self.add_derivatives and self.angle_pose:
                 sample = self.make_angle_derivative_sample(sample)
+
+            if self.add_derivatives and not self.angle_pose:
+                sample = self.make_xy_derivative_sample(sample)
 
             self.samples_memory[pos] = sample
 
@@ -349,7 +352,7 @@ class DBLoader2NPY(Sequence):
             if self.scaler_cls is not None and not self.angle_pose:
                 sample = DBLoader2NPY.scale_single_sample(sample, self.scaler_cls)
 
-            if self.add_angle_derivatives and self.angle_pose:
+            if self.add_derivatives and self.angle_pose:
                 sample = self.make_angle_derivative_sample(sample)
 
             if not self.angle_pose:
@@ -440,7 +443,8 @@ class DBLoader2NPY(Sequence):
 
         return np.stack(sample_in_npy, axis=0)
 
-    def make_angle_derivative_sample(self, sample, padding='zeros') -> pd.DataFrame:
+    @staticmethod
+    def make_angle_derivative_sample(sample, padding='zeros') -> pd.DataFrame:
         """
 
         Parameters
@@ -480,6 +484,58 @@ class DBLoader2NPY(Sequence):
                 if key == 'frame':
                     continue
                 sample_data_in_dict[f'DP-DT-{key}'].append(0)
+        elif padding == 'cut_last':
+            for key in sample.keys():
+                if key == 'frame':
+                    continue
+                sample_data_in_dict[key].pop()
+        else:
+            raise TypeError(f'worng padding type PADDING TYPE -> {padding}')
+
+        return pd.DataFrame(sample_data_in_dict)
+
+    @staticmethod
+    def make_xy_derivative_sample(sample, padding='zeros') -> pd.DataFrame:
+        """
+
+        Parameters
+        ----------
+        sample
+        padding
+
+        Returns
+        -------
+
+        """
+
+        # colocar todos os dados da amostra em um dicionario para construir um novo dataframe.
+        sample_data_in_dict = {key: sample[key].values.tolist() for key in sample.keys()}
+
+        # obter todas as linhas da amostra para iterar nelas na construição das derivadas
+        all_rows_in_sample = [x[1] for x in sample.iterrows()]
+        new_keys = all_rows_in_sample[1] - all_rows_in_sample[0]
+        sample_data_in_dict.update({
+            f'DXY-DT-{key}': [] for key in new_keys.keys() if key != 'frame'
+        })
+
+        for it in range(0, sample.shape[0] - 1):
+            # obtém cada linha para calcular a derivada finita.
+            row_0 = all_rows_in_sample[it]
+            row_1 = all_rows_in_sample[it + 1]
+
+            # derivada é construida aki
+            new_row_dt = row_1 - row_0
+            for key in new_row_dt.keys():
+                if key == 'frame':
+                    continue
+
+                sample_data_in_dict[f'DXY-DT-{key}'].append(new_row_dt[key])
+
+        if padding == 'zeros':
+            for key in new_keys.keys():
+                if key == 'frame':
+                    continue
+                sample_data_in_dict[f'DXY-DT-{key}'].append(np.array([0.0, 0.0, 0.0]))
         elif padding == 'cut_last':
             for key in sample.keys():
                 if key == 'frame':
