@@ -107,9 +107,9 @@ def make_3dpoints(fx, fy, frame=0):
 fig = plt.figure(figsize=(21, 9), dpi=720//9)
 ax = fig.add_subplot(111, projection='3d')
 
-x_scale=8
-y_scale=8
-z_scale=8
+x_scale=10
+y_scale=10
+z_scale=10
 
 scale=np.diag([x_scale, y_scale, z_scale, 1.0])
 scale=scale*(1.0/scale.max())
@@ -144,6 +144,19 @@ for pair in BODY_PAIRS:
             [df_res[pair[0]][0][2], df_res[pair[1]][0][2]]
         ))
 
+x_min = min([df_res[key][0][0] for key in df_res.keys() if df_res[key][0] is not None])
+x_max = max([df_res[key][0][0] for key in df_res.keys() if df_res[key][0] is not None])
+
+y_min = min([df_res[key][0][1] for key in df_res.keys() if df_res[key][0] is not None])
+y_max = max([df_res[key][0][1] for key in df_res.keys() if df_res[key][0] is not None])
+
+z_min = min([df_res[key][0][2] for key in df_res.keys() if df_res[key][0] is not None])
+z_max = max([df_res[key][0][2] for key in df_res.keys() if df_res[key][0] is not None])
+
+ax.axes.set_xlim3d(left=x_min, right=x_max)
+ax.axes.set_ylim3d(bottom=y_min, top=y_max)
+ax.axes.set_zlim3d(bottom=z_min, top=z_max)
+
 ax.margins(x=0)
 
 axcolor = 'lightgoldenrodyellow'
@@ -152,11 +165,11 @@ ax_fy = plt.axes([0.25, 0.15, 0.65, 0.03], facecolor=axcolor)
 frame_num = plt.axes([0.25, 0.20, 0.65, 0.03], facecolor=axcolor)
 ax_fxy = plt.axes([0.25, 0.05, 0.65, 0.03], facecolor=axcolor)
 
-slider_fx = Slider(ax_fx, 'Foco X (fx)', 1, 100.0, valinit=f0, valstep=delta_fx)
-slider_fy = Slider(ax_fy, 'Foco Y (fy)', 1, 100.0, valinit=f0, valstep=delta_fy)
-slider_frame = Slider(frame_num, 'Curr Frame', 0, 100, valinit=f0, valstep=1.0)
+slider_fx = Slider(ax_fx, 'Foco X (fx)', 1, 1000.0, valinit=f0, valstep=delta_fx)
+slider_fy = Slider(ax_fy, 'Foco Y (fy)', 1, 1000.0, valinit=f0, valstep=delta_fy)
+slider_frame = Slider(frame_num, 'Curr Frame', 0, 1000, valinit=f0, valstep=1.0)
 
-slider_fxy = Slider(ax_fxy, 'Foco X e Y (fx e fy)', 1, 100.0, valinit=f0, valstep=delta_fy)
+slider_fxy = Slider(ax_fxy, 'Foco X e Y (fx e fy)', 1, 1000.0, valinit=f0, valstep=delta_fy)
 
 
 def update(val):
@@ -189,6 +202,18 @@ def update_fig(fx, fy, frame):
                 [df_res[pair[0]][0][2], df_res[pair[1]][0][2]]
             ))
 
+    x_min = min([df_res[key][0][0] for key in df_res.keys() if df_res[key][0] is not None])
+    x_max = max([df_res[key][0][0] for key in df_res.keys() if df_res[key][0] is not None])
+
+    y_min = min([df_res[key][0][1] for key in df_res.keys() if df_res[key][0] is not None])
+    y_max = max([df_res[key][0][1] for key in df_res.keys() if df_res[key][0] is not None])
+
+    z_min = min([df_res[key][0][2] for key in df_res.keys() if df_res[key][0] is not None])
+    z_max = max([df_res[key][0][2] for key in df_res.keys() if df_res[key][0] is not None])
+
+    ax.axes.set_xlim3d(left=x_min, right=x_max)
+    ax.axes.set_ylim3d(bottom=y_min, top=y_max)
+    ax.axes.set_zlim3d(bottom=z_min, top=z_max)
     plt.draw()
 
 def update_fxy(val):
@@ -204,13 +229,14 @@ slider_fy.on_changed(update)
 slider_frame.on_changed(update)
 slider_fxy.on_changed(update_fxy)
 
-resetax = plt.axes([0.8, 0.025, 0.1, 0.04])
+resetax = plt.axes([0.8, 0.008, 0.1, 0.04])
 button = Button(resetax, 'Reset', color=axcolor, hovercolor='0.975')
 
 def reset(event):
     slider_fx.reset()
     slider_fy.reset()
     slider_frame.reset()
+    slider_fxy.reset()
 
 button.on_clicked(reset)
 
