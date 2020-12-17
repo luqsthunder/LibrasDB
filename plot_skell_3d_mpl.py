@@ -11,11 +11,9 @@ from matplotlib import cm
 from mpl_toolkits.mplot3d.axes3d import Axes3D, get_test_data
 from matplotlib.widgets import Slider, Button, RadioButtons
 
-person = 'left'
-version = 2
-front_data_path = f'v1098_barely_front_view_{person}_person.csv'
-side_data_path = f'v0180_side_view_{person}_person.csv'
-destination_path = f'./{person}_person_3d_{version}.csv'
+front_data_path = 'v1098_barely_front_view_lef_person.csv'
+side_data_path = 'v0180_side_view_lef_person.csv'
+#destination_path = f'./{person}_person_3d_{version}.csv'
 
 left_front_data = pd.read_csv(front_data_path)
 df = pd.DataFrame(left_front_data)
@@ -40,8 +38,7 @@ all_frames = left_front_data.frame.unique().tolist()
 
 matches = []
 
-for i in range(0,len(all_frames),5):
-    i += random.randrange(-2,2)
+for i in range(0,len(all_frames),10):
     row_front = left_front_data[left_front_data['frame'] == all_frames[i]]
     row_front = row_front[all_joints_to_use].values[0]
     row_front = [x if x[2] >= threshold else None for x in row_front]
@@ -131,9 +128,22 @@ delta_fy = 1.0
 df_res = make_3dpoints(1, 1, 0)
 global chart
 global lines
-chart = ax.scatter([df_res[key][0][0] for key in df_res.keys() if df_res[key][0] is not None],
-                   [df_res[key][0][1] for key in df_res.keys() if df_res[key][0] is not None],
-                   [df_res[key][0][2] for key in df_res.keys() if df_res[key][0] is not None])
+
+#-------------------------------------------------------------------------
+chart = []
+colors = ['r','b','g','y','c','m','k','#56004B','#0B2B6B']
+bp = ['Nose', 'Neck', 'RShoulder', 'RElbow', 'RWrist','LShoulder', 'LElbow', '?', '??']
+i = 0
+for key in df_res.keys():
+    if df_res[key][0] is not None and df_res[key][0] is not None and df_res[key][0] is not None:
+        chart.append(ax.scatter(df_res[key][0][0],df_res[key][0][1],df_res[key][0][2],color = colors[i], label = bp[i], s = 40))
+        i+=1
+#-------------------------------------------------------------------------
+
+#chart = ax.scatter([df_res[key][0][0] for key in df_res.keys() if df_res[key][0] is not None],
+#                   [df_res[key][0][1] for key in df_res.keys() if df_res[key][0] is not None],
+#                   [df_res[key][0][2] for key in df_res.keys() if df_res[key][0] is not None],
+#                   color = 'k')
 
 lines = []
 for pair in BODY_PAIRS:
@@ -141,7 +151,8 @@ for pair in BODY_PAIRS:
         lines.append(ax.plot(
             [df_res[pair[0]][0][0], df_res[pair[1]][0][0]],
             [df_res[pair[0]][0][1], df_res[pair[1]][0][1]],
-            [df_res[pair[0]][0][2], df_res[pair[1]][0][2]]
+            [df_res[pair[0]][0][2], df_res[pair[1]][0][2]],
+            color = 'k'
         ))
 
 x_min = min([df_res[key][0][0] for key in df_res.keys() if df_res[key][0] is not None])
@@ -184,10 +195,24 @@ def update_fig(fx, fy, frame):
     global lines
     df_res = make_3dpoints(fx, fy, frame)
 
-    chart.remove()
-    chart = ax.scatter([df_res[key][0][0] for key in df_res.keys() if df_res[key][0] is not None],
-                       [df_res[key][0][1] for key in df_res.keys() if df_res[key][0] is not None],
-                       [df_res[key][0][2] for key in df_res.keys() if df_res[key][0] is not None])
+    #-------------------------------------------------------------------------
+    for it in range(len(chart)):
+        chart[it].remove()
+        
+    chart = []
+    colors = ['r','b','g','y','c','m','k','#56004B','#0B2B6B']
+    bp = ['Nose', 'Neck', 'RShoulder', 'RElbow', 'RWrist','LShoulder', 'LElbow', '?', '??']
+    i = 0
+    for key in df_res.keys():
+        if df_res[key][0] is not None and df_res[key][0] is not None and df_res[key][0] is not None:
+            chart.append(ax.scatter(df_res[key][0][0],df_res[key][0][1],df_res[key][0][2],color = colors[i], label = bp[i], s = 40))
+            i+=1
+    #-------------------------------------------------------------------------
+    #chart.remove()
+    #chart = ax.scatter([df_res[key][0][0] for key in df_res.keys() if df_res[key][0] is not None],
+    #                   [df_res[key][0][1] for key in df_res.keys() if df_res[key][0] is not None],
+    #                   [df_res[key][0][2] for key in df_res.keys() if df_res[key][0] is not None])
+
 
     for it in range(len(lines)):
         a = lines[it].pop(0)
@@ -199,7 +224,8 @@ def update_fig(fx, fy, frame):
             lines.append(ax.plot(
                 [df_res[pair[0]][0][0], df_res[pair[1]][0][0]],
                 [df_res[pair[0]][0][1], df_res[pair[1]][0][1]],
-                [df_res[pair[0]][0][2], df_res[pair[1]][0][2]]
+                [df_res[pair[0]][0][2], df_res[pair[1]][0][2]],
+                color = 'k'
             ))
 
     x_min = min([df_res[key][0][0] for key in df_res.keys() if df_res[key][0] is not None])
@@ -239,5 +265,7 @@ def reset(event):
     slider_fxy.reset()
 
 button.on_clicked(reset)
+
+ax.legend()
 
 plt.show()
