@@ -249,7 +249,7 @@ def make_base_classifier(net, pose_db, pose, amount_lstm, lstm_1_units, lstm_2_u
     except ValueError as e:
         print(e)
 
-    fit_res = net.fit(pose_db.train(), epochs=epochs, verbose=0, shuffle=False, workers=2,
+    fit_res = net.fit(pose_db.train(), epochs=epochs, verbose=1, shuffle=False, workers=2,
                       callbacks=[early_stopper], validation_data=pose_db.validation())
 
     cnn_str_params = f'CNN Kernel {cnn_kernel} Filters {cnn_1_filters} {cnn_2_filters}' \
