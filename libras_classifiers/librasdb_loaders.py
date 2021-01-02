@@ -3,12 +3,15 @@ import math
 import numpy as np
 import pandas as pd
 import tensorflow as tf
+from tensorflow.keras.utils import Sequence
 from tqdm.auto import tqdm
 from pose_extractor.all_parts import *
 import sklearn as sk
+from sklearn.model_selection import StratifiedKFold
+import random
 
 
-class DBLoader2NPY(tf.keras.utils.Sequence):
+class DBLoader2NPY(Sequence):
     """
     Responsavem por carregar as poses dos CSVs para formato usavel pelo keras
     pytorch ou outros frameworks que utilizam numpy.
@@ -17,7 +20,9 @@ class DBLoader2NPY(tf.keras.utils.Sequence):
     """
 
     def __init__(self, db_path, batch_size, angle_pose=True, no_hands=True, joints_2_use=None,
-                 maintain_memory=True, make_k_fold=False, k_fold_amount=None, const_none_angle_rep=0,
+                 shuffle=False, test_size=0.3, add_derivatives=False,
+                 maintain_memory=True, make_k_fold=False, k_fold_amount=None, only_that_classes=None,
+                 scaler_cls=None, not_use_pbar_in_load=False, custom_internal_dir=None, const_none_angle_rep=0,
                  const_none_xy_rep=np.array([0, 0, 0])):
         """
         Parameters
@@ -52,33 +57,102 @@ class DBLoader2NPY(tf.keras.utils.Sequence):
             Reresentação que deve ser usada caso uma pose xy nula exista.
 
         """
+        self.count = 0
         self.db_path = db_path; self.const_none_angle_rep = const_none_angle_rep
         self.const_none_xy_rep = const_none_xy_rep
         self.angle_pose = angle_pose
         self.batch_size = batch_size
         self.make_k_fold = make_k_fold; self.k_fold_amount = k_fold_amount
         self.joints_2_use = joints_2_use
+        self.add_derivatives = add_derivatives
+        self.scaler_cls = scaler_cls
 
         angle_or_xy = 'angle' if angle_pose else 'xy'
         angle_or_xy = 'no_hands-' + angle_or_xy \
             if no_hands else 'hands-' + angle_or_xy
         self.angle_or_xy = angle_or_xy
         self.cls_dirs = []
+        self.only_that_classes = only_that_classes
+        self.shuffle = shuffle
 
+        self.samples_path, self.cls_dirs = DBLoader2NPY.read_all_db_folders(db_path, only_that_classes, angle_or_xy,
+                                                                            custom_internal_dir)
+        self.all_samples_separated_ids = DBLoader2NPY.separate_samples_with_their_real_ids(self.samples_path,
+                                                                                           len(self.cls_dirs))
+        self.all_samples_ids = []
+
+        self.maintain_memory = maintain_memory
+        self.samples_memory = [None for _ in range(len(self.samples_path))]
+        self.samples_memory_xy_npy = [None for _ in range(len(self.samples_path))]
+        self.longest_sample = None
+        self.longest_sample = self.find_longest_sample(no_pbar=not_use_pbar_in_load)
+        self.weight_2_samples = None
+
+        if self.angle_pose and self.add_derivatives and self.joints_2_use is not None:
+            self.joints_2_use = self.joints_2_use + [f'DP-DT-{x}' for x in self.joints_2_use if x != 'frame']
+
+        self.k_fold_iteration = 0
+        self.k_folder = None
+
+        self.y = np.array([x[1] for x in self.samples_path])
+        self.x = np.array([it for it in range(len(self.samples_path))])
+        self._train_ids, self._val_ids, self._y_train, self._y_test = \
+            sk.model_selection.train_test_split(self.x, self.y, test_size=test_size, random_state=5, stratify=self.y)
+        if self.make_k_fold:
+            self.k_folder = StratifiedKFold(n_splits=self.k_fold_amount, shuffle=False)
+           #self.train_set, self.val_set = self.k_fold_samples()
+
+        print('separated_samples')
+
+    @staticmethod
+    def separate_samples_with_their_real_ids(all_samples, amount_classes, get_y_array=False):
+        all_sample_separated = [
+            [key for key, x in enumerate(all_samples) if x[1] == it] for it in range(amount_classes)
+        ]
+
+        if get_y_array:
+            pass
+
+        return all_sample_separated
+
+    @staticmethod
+    def read_all_db_folders(db_path, only_that_classes, angle_or_xy, custom_internal_dir=None):
+        """
+
+        Parameters
+        ----------
+        db_path
+        only_that_classes
+        angle_or_xy
+        custom_internal_dir
+
+        Returns
+        -------
+
+        """
         try:
-            self.cls_dirs = [os.path.join(db_path, x)
-                             for x in os.listdir(db_path)]
-            self.cls_dirs = list(filter(os.path.isdir, self.cls_dirs))
+            cls_dirs = [x for x in os.listdir(db_path)]
+            if only_that_classes is not None:
+                cls_dirs = list(filter(lambda x: x in only_that_classes, cls_dirs))
+            if len(cls_dirs) == 0:
+                raise RuntimeError(f'Classes that was required it was not found. This was required classes that was '
+                                   f'given {only_that_classes}, and this is the db_path: {db_path}')
+
+            cls_dirs = [os.path.join(db_path, x) for x in cls_dirs]
+            cls_dirs = list(filter(os.path.isdir, cls_dirs))
         except (FileNotFoundError, NotADirectoryError) as e:
             error_msg = '\n error in constructor DBLoader2NPY ' \
-                        'using db_path {} \n '\
+                        'using db_path {} \n ' \
                         'using pose as {}'.format(db_path, angle_or_xy)
             print(e, error_msg)
             raise RuntimeError(error_msg)
 
-        self.samples_path = []
-        for it, class_dir in enumerate(self.cls_dirs):
-            dir_to_walk = os.path.join(class_dir, angle_or_xy)
+        samples_path = []
+        for it, class_dir in enumerate(cls_dirs):
+            # aqui setamos o diretorio interno caso exista um, no caso de não existir seguimos o padrão de: xy_pose
+            # para poses completas, angle_pose para as poses com angulos, no_hand-xy_pose para as poses xy sem as mãos.
+            internal_dir = angle_or_xy if custom_internal_dir is None else custom_internal_dir
+            dir_to_walk = os.path.join(class_dir, internal_dir)
             all_samples_in_class = [os.path.join(dir_to_walk, x)
                                     for x in os.listdir(dir_to_walk)]
             all_samples_in_class = list(filter(os.path.isfile,
@@ -86,25 +160,14 @@ class DBLoader2NPY(tf.keras.utils.Sequence):
             samples_class = [it] * len(all_samples_in_class)
             all_samples_in_class = list(zip(all_samples_in_class,
                                             samples_class))
-            self.samples_path.extend(all_samples_in_class)
+            samples_path.extend(all_samples_in_class)
 
-        self.maintain_memory = maintain_memory
-        self.samples_memory = [None for _ in range(len(self.samples_path))]
-        self.samples_memory_xy_npy = [None for _ in range(len(self.samples_path))]
-        self.longest_sample = None
-        self.longest_sample = self.find_longest_sample()
-        self.weight_2_samples = None
-
-        self.k_fold_iteration = 0
-        self.k_folder = None
-        if self.make_k_fold:
-            self.k_folder = sk.model_selection.KFold(n_splits=self.k_fold_amount)
-            self.X_train, self.X_test = self.k_fold_samples()
+        return samples_path, cls_dirs
 
     def k_fold_samples(self):
-        return next(self.k_folder.split(self.samples_memory))
+        return next(self.k_folder.split(self.all_samples_separated_ids, y=self.y))
 
-    def find_longest_sample(self):
+    def find_longest_sample(self, no_pbar=False):
         """
 
         Returns
@@ -115,7 +178,7 @@ class DBLoader2NPY(tf.keras.utils.Sequence):
         """
         if self.longest_sample is None:
             db_idx = [x for x in range(len(self.samples_path))]
-            len_size, y = self.batch_load_samples(db_idx, as_npy=False, pbar=tqdm())
+            len_size, y = self.batch_load_samples(db_idx, as_npy=False, pbar=tqdm() if not no_pbar else None)
             len_size = max(len_size, key=lambda x: x.shape[0]).shape[0]
             return len_size
         else:
@@ -267,6 +330,15 @@ class DBLoader2NPY(tf.keras.utils.Sequence):
             if not self.angle_pose:
                 sample = sample.applymap(self.parse_npy_vec_str)
 
+            if self.scaler_cls is not None and not self.angle_pose:
+                sample = DBLoader2NPY.scale_single_sample(sample, self.scaler_cls)
+
+            if self.add_derivatives and self.angle_pose:
+                sample = self.make_angle_derivative_sample(sample)
+
+            if self.add_derivatives and not self.angle_pose:
+                sample = self.make_xy_derivative_sample(sample)
+
             self.samples_memory[pos] = sample
 
         elif self.samples_memory is not None and self.maintain_memory:
@@ -276,6 +348,12 @@ class DBLoader2NPY(tf.keras.utils.Sequence):
             sample = sample.set_index('Unnamed: 0')
             if clean_nan:
                 sample = self.__clean_sample(sample)
+
+            if self.scaler_cls is not None and not self.angle_pose:
+                sample = DBLoader2NPY.scale_single_sample(sample, self.scaler_cls)
+
+            if self.add_derivatives and self.angle_pose:
+                sample = self.make_angle_derivative_sample(sample)
 
             if not self.angle_pose:
                 sample = sample.applymap(self.parse_npy_vec_str)
@@ -309,8 +387,27 @@ class DBLoader2NPY(tf.keras.utils.Sequence):
                     for f in self.joints_used()
                 })
 
-                self.samples_memory[it] = sample.append(empty_df,
-                                                        ignore_index=True)
+                self.samples_memory[it] = empty_df.append(sample,
+                                                          ignore_index=True)
+
+    @staticmethod
+    def scale_single_sample(sample, scale_cls, scale_kwargs={}):
+        all_frames = sample['frame'].unique().tolist()
+        for frame in all_frames:
+            curr_pose = sample[sample.frame == frame]
+            all_x_from_this_frame = [x[0] for x in curr_pose.values[0][2:]]
+            all_y_from_this_frame = [x[1] for x in curr_pose.values[0][2:]]
+            xscaler = scale_cls(**scale_kwargs)
+            res_x = xscaler.fit(np.array(all_x_from_this_frame).reshape((-1, 1))) \
+                           .transform(np.array(all_x_from_this_frame).reshape((-1, 1)))
+
+            res_y = xscaler.fit(np.array(all_y_from_this_frame).reshape((-1, 1))) \
+                           .transform(np.array(all_y_from_this_frame).reshape((-1, 1)))
+
+            for it in range(len(curr_pose.values[0][2:])):
+                curr_pose.values[0][it + 2][:2] = [res_x[it], res_y[it]]
+
+        return sample
 
     @staticmethod
     def __stack_xy_pose_2_npy(sample: pd.DataFrame):
@@ -335,13 +432,119 @@ class DBLoader2NPY(tf.keras.utils.Sequence):
             a amostra convertida para np.array
         """
         sample_in_npy = []
-        for row in sample.iterrows():
+        # um row do sample é um frame apenas, como queremos desconsiderar os frames para o classificador, pegamos o
+        # row da posição 1 em diante pois o "frame" esta na posição 0 do row
+        sample_to_npy = sample.drop(columns=["frame"])
+        for row in sample_to_npy.iterrows():
             row = row[1]
-            sample_in_npy.append(np.stack(row.values[1:], axis=0))
+            sample_in_npy.append(np.stack(row.values, axis=0))
 
         sample_in_npy = np.stack(sample_in_npy, axis=0)
 
         return np.stack(sample_in_npy, axis=0)
+
+    @staticmethod
+    def make_angle_derivative_sample(sample, padding='zeros') -> pd.DataFrame:
+        """
+
+        Parameters
+        ----------
+        sample
+        padding
+
+        Returns
+        -------
+
+        """
+        # colocar todos os dados da amostra em um dicionario para construir um novo dataframe.
+        sample_data_in_dict = {key: sample[key].values.tolist() for key in sample.keys()}
+
+        # obter todas as linhas da amostra para iterar nelas na construição das derivadas
+        all_rows_in_sample = [x[1] for x in sample.iterrows()]
+        new_keys = all_rows_in_sample[1] - all_rows_in_sample[0]
+        sample_data_in_dict.update({
+            f'DP-DT-{key}': [] for key in new_keys.keys() if key != 'frame'
+        })
+
+        for it in range(0, sample.shape[0] - 1):
+            # obtém cada linha para calcular a derivada finita.
+            row_0 = all_rows_in_sample[it]
+            row_1 = all_rows_in_sample[it + 1]
+
+            # derivada é construida aki
+            new_row_dt = row_1 - row_0
+            for key in new_row_dt.keys():
+                if key == 'frame':
+                    continue
+
+                sample_data_in_dict[f'DP-DT-{key}'].append(new_row_dt[key])
+
+        if padding == 'zeros':
+            for key in new_keys.keys():
+                if key == 'frame':
+                    continue
+                sample_data_in_dict[f'DP-DT-{key}'].append(0)
+        elif padding == 'cut_last':
+            for key in sample.keys():
+                if key == 'frame':
+                    continue
+                sample_data_in_dict[key].pop()
+        else:
+            raise TypeError(f'worng padding type PADDING TYPE -> {padding}')
+
+        return pd.DataFrame(sample_data_in_dict)
+
+    @staticmethod
+    def make_xy_derivative_sample(sample, padding='zeros') -> pd.DataFrame:
+        """
+
+        Parameters
+        ----------
+        sample
+        padding
+
+        Returns
+        -------
+
+        """
+
+        # colocar todos os dados da amostra em um dicionario para construir um novo dataframe.
+        sample_data_in_dict = {key: sample[key].values.tolist() for key in sample.keys()}
+
+        # obter todas as linhas da amostra para iterar nelas na construição das derivadas
+        all_rows_in_sample = [x[1] for x in sample.iterrows()]
+        new_keys = all_rows_in_sample[1] - all_rows_in_sample[0]
+        sample_data_in_dict.update({
+            f'DXY-DT-{key}': [] for key in new_keys.keys() if key != 'frame'
+        })
+
+        for it in range(0, sample.shape[0] - 1):
+            # obtém cada linha para calcular a derivada finita.
+            row_0 = all_rows_in_sample[it]
+            row_1 = all_rows_in_sample[it + 1]
+
+            # derivada é construida aki
+            new_row_dt = row_1 - row_0
+            for key in new_row_dt.keys():
+                if key == 'frame':
+                    continue
+
+                sample_data_in_dict[f'DXY-DT-{key}'].append(new_row_dt[key])
+
+        if padding == 'zeros':
+            for key in new_keys.keys():
+                if key == 'frame':
+                    continue
+                sample_data_in_dict[f'DXY-DT-{key}'].append(np.array([0.0, 0.0, 0.0]))
+        elif padding == 'cut_last':
+            for key in sample.keys():
+                if key == 'frame':
+                    continue
+                sample_data_in_dict[key].pop()
+        else:
+            raise TypeError(f'worng padding type PADDING TYPE -> {padding}')
+
+        return pd.DataFrame(sample_data_in_dict)
 
     def batch_load_samples(self, samples_idxs, as_npy=True, clean_nan=True, pbar: tqdm = None):
         """
@@ -372,7 +575,7 @@ class DBLoader2NPY(tf.keras.utils.Sequence):
         Y = []
         for idx in samples_idxs:
             x, y = self.__load_sample_by_pos(idx, clean_nan=clean_nan)
-            if not self.angle_pose and self.joints_2_use is not None:
+            if self.joints_2_use is not None:
                 x = x[self.joints_2_use]
             if not self.angle_pose:
                 x = x.applymap(lambda c: c[:2] if type(c) is np.ndarray else c)
@@ -385,7 +588,7 @@ class DBLoader2NPY(tf.keras.utils.Sequence):
 
                 X.append(x)
             else:
-                X.append(x.values if as_npy else x)
+                X.append(x.drop(columns=['frame']).values if as_npy else x)
             Y.append(y)
 
             if pbar is not None:
@@ -403,20 +606,17 @@ class DBLoader2NPY(tf.keras.utils.Sequence):
             new_shape = tuple(new_shape)
             X = np.concatenate(X).reshape(new_shape)
 
+        if as_npy and not self.angle_pose:
+            X = np.stack(X, axis=0)
+
         return X, Y
 
     def __getitem__(self, index):
         beg = index * self.batch_size
 
-        end = (index + 1) * self.batch_size \
-            if (index + 1) * self.batch_size < self.db_length() \
-            else self.db_length()
+        end = np.min([(index + 1) * self.batch_size, self.db_length()])
 
-        x, y = self.batch_load_samples(list(range(beg, end)))
-
-        # the first coordinate of features is frame and we not need it.
-        #x = x[:, :, 1:]
-        #print(f'{index}: {beg}->{end} shape: {x.shape}, {y.shape}')
+        x, y = self.batch_load_samples(self.x[beg: end])
         return x, y, [None]
 
     def __len__(self):
@@ -429,3 +629,33 @@ class DBLoader2NPY(tf.keras.utils.Sequence):
         """
         return math.ceil(self.db_length() / self.batch_size)
 
+    def on_epoch_end(self):
+        if self.shuffle:
+            np.random.shuffle(self.x)
+
+    def validation(self):
+        return InternalBaseKerasIterator(self, self._val_ids)
+
+    def train(self):
+        return InternalBaseKerasIterator(self, self._train_ids)
+
+
+class InternalBaseKerasIterator(Sequence):
+    def __init__(self, parent, ids):
+        self.parent = parent
+        self.ids = ids
+
+    def __getitem__(self, index):
+        beg = index * self.parent.batch_size
+
+        end = np.min([(index + 1) * self.parent.batch_size, len(self.ids)])
+
+        x, y = self.parent.batch_load_samples(self.ids[beg: end])
+
+        return x, y #[None] if tf.__version__.split('.')[1] == 1 else x, y
+
+    def __len__(self):
+        return math.ceil(len(self.ids) / self.parent.batch_size)
+
+    def on_epoch_end(self):
+        np.random.shuffle(self.ids)

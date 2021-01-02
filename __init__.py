@@ -1,1 +1,1 @@
-__path__ = ['visualization', 'pose_extractor']
+# __path__ = ['visualization', 'pose_extractor']

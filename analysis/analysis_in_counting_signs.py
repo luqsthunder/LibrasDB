@@ -3,12 +3,13 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 from tqdm import tqdm
+import os
 from PIL import ImageFont, ImageDraw, Image
 import matplotlib.ticker as ticker
 import cv2 as cv
 
 
-db_path = '../all_videos.csv'
+db_path = 'all_videos.csv'
 sign_db = pd.read_csv(db_path)
 print(sign_db.head(n=10))
 
@@ -19,11 +20,16 @@ for sign in tqdm(signs_name):
     count_signs.append(dict(name=sign,
                             count=sign_db[sign_db.sign == sign].sign.count()))
 
+
+
 sorted_signs = sorted(count_signs, reverse=True, key=lambda x: x['count'])
+each_sign_duration = []
 sorted_sings_count_mode = []
 for x in sorted_signs:
+    # caso seja menor que 30 a quantidade de amostras do sinal desconsidere-o.
     if x['count'] < 30:
         continue
+
     sorted_sings_count_mode.extend([x['name']] * int(x['count']))
 
 more_than_30_df = pd.DataFrame(data=dict(sign=sorted_sings_count_mode))
@@ -182,3 +188,19 @@ for sample in tqdm(more_than_30_samples):
 
 final_video.release()
 
+# %%
+libras_corpus_index_string = sign_db.folder_name.iloc[0].replace('\\', '/').split('/')
+libras_corpus_index_string = libras_corpus_index_string.index('LibrasCorpus')
+sign_db.folder_name = \
+    sign_db.folder_name.map(lambda x: os.path.join(*(x.replace('\\', '/').split('/')[libras_corpus_index_string:])))
+
+sign_db.folder = \
+    sign_db.folder.map(lambda x: os.path.join(*(x.replace('\\', '/').split('/')[libras_corpus_index_string:])))
+
+sign_db.estate = \
+    sign_db.estate.map(lambda x: os.path.join(*(x.replace('\\', '/').split('/')[libras_corpus_index_string + 1:])))
+
+
+# %%
+
+all_folders = sign_db.folder_name.unique().tolist()

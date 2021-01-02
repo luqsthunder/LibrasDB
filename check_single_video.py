@@ -25,7 +25,7 @@ if __name__ == '__main__':
     #args = parser.parse_args()
     
 
-    rm_bad = False
+    rm_bad = True
     if os.path.isdir(sys.argv[1]):
         bad_list = []
         for file in tqdm(os.listdir(sys.argv[1]), position=1):
@@ -41,3 +41,4 @@ if __name__ == '__main__':
                 os.remove(b_file)
     else:
         check_single_video(sys.argv[1])
+# 487

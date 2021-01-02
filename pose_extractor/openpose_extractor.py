@@ -35,6 +35,7 @@ class OpenposeExtractor:
             self.op_wrapper = op.WrapperPython()
             self.op_wrapper.configure(params)
             self.op_wrapper.start()
+        self.op = op
 
     @staticmethod
     def try_import_openpose(openpose_build_path):

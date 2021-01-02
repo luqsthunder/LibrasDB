@@ -6,8 +6,12 @@ import numpy as np
 import pandas as pd
 import matplotlib.ticker as ticker
 import matplotlib.pyplot as plt
+from copy import copy
+from libras_classifiers.librasdb_loaders import DBLoader2NPY
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
+
+from pose_extractor.extract_mutitple_videos import ExtractMultipleVideos
 from pose_extractor.pose_centroid_tracker import PoseCentroidTracker
 from PyQt5.QtCore import QThread, Qt, pyqtSignal, pyqtSlot, QMutex, QModelIndex
 from PyQt5.QtGui import QImage, QPixmap
@@ -201,11 +205,12 @@ class App(QWidget):
 
 class ViewDBCutVideos(OCVVideoThread):
 
-    def __init__(self, all_videos_df_path, db_path, angle_db, th_list, th_slider):
+    def __init__(self, all_videos_df_path, db_path, angle_db, th_list, th_slider, vid_sync):
         super().__init__()
         self.curr_samples_list = th_list
         self.time_slider = th_slider
         self.all_videos = pd.read_csv(all_videos_df_path)
+        self.vid_sync = vid_sync if isinstance(vid_sync, pd.DataFrame) else pd.read_csv(vid_sync)
         self.all_videos_path = sorted(list(self.all_videos.folder_name.unique()))
         self.curr_video_idx = 0
         self.cap = None
@@ -224,21 +229,21 @@ class ViewDBCutVideos(OCVVideoThread):
         self.last_frame = None
 
         self.joints_angle_2_use = [
-            'Neck-RShoulder-RElbow',
-            'RShoulder-RElbow-RWrist',
-            'Neck-LShoulder-LElbow',
-            'LShoulder-LElbow-LWrist',
-            'RShoulder-Neck-LShoulder',
-            'l-Wrist-l-ThumbProximal-l-ThumbDistal',
-            # 'r-Wrist-r-ThumbProximal-r-ThumbDistal',
-            # 'l-Wrist-l-IndexFingerProximal-l-IndexFingerDistal',
-            # 'r-Wrist-r-IndexFingerProximal-r-IndexFingerDistal',
-            # 'l-Wrist-l-MiddleFingerProximal-l-MiddleFingerDistal',
-            # 'r-Wrist-r-MiddleFingerProximal-r-MiddleFingerDistal',
-            # 'l-Wrist-l-RingFingerProximal-l-RingFingerDistal',
-            # 'r-Wrist-r-RingFingerProximal-r-RingFingerDistal',
-            # 'l-Wrist-l-LittleFingerProximal-l-LittleFingerDistal',
-            'r-Wrist-r-LittleFingerProximal-r-LittleFingerDistal'
+            'Neck-RShoulderight-RElbow',
+            'RShoulderight-RElbow-RWrist',
+            'Neck-LShoulderight-LElbow',
+            'LShoulderight-LElbow-LWrist',
+            'RShoulderight-Neck-LShoulder',
+            'left-Wrist-left-ThumbProximal-left-ThumbDistal',
+            'right-Wrist-right-ThumbProximal-right-ThumbDistal',
+            'left-Wrist-left-IndexFingerProximal-left-IndexFingerDistal',
+            'right-Wrist-right-IndexFingerProximal-right-IndexFingerDistal',
+            'left-Wrist-left-MiddleFingerProximal-left-MiddleFingerDistal',
+            'right-Wrist-right-MiddleFingerProximal-right-MiddleFingerDistal',
+            'left-Wrist-left-RingFingerProximal-left-RingFingerDistal',
+            'right-Wrist-right-RingFingerProximal-right-RingFingerDistal',
+            'left-Wrist-left-LittleFingerProximal-left-LittleFingerDistal',
+            'right-Wrist-right-LittleFingerProximal-right-LittleFingerDistal'
         ]
         
         self.color_array = ['#e53242', '#ffb133', '#3454da', '#ddc3d0', '#005a87', '#df6722', '#00ffff',
@@ -309,7 +314,7 @@ class ViewDBCutVideos(OCVVideoThread):
             self.__write_info_2_im(frame, font_scale=1)
 
             if self.frame_angle is not None:
-                frame = self.__hconcat_resize_min([frame, self.frame_angle])
+                frame = self.hconcat_resize_min([frame, self.frame_angle])
 
         self.last_frame = frame
         return ret, frame
@@ -320,7 +325,7 @@ class ViewDBCutVideos(OCVVideoThread):
         return tuple(int(h[i:i+2], 16) for i in (0, 2, 4))
 
     @staticmethod
-    def __hconcat_resize_min(im_list, interpolation=cv2.INTER_CUBIC):
+    def hconcat_resize_min(im_list, interpolation=cv2.INTER_CUBIC):
         h_max = max(im.shape[0] for im in im_list)
         im_list_resize = [cv2.resize(im, (int(im.shape[1] * h_max / im.shape[0]), h_max), interpolation=interpolation)
                           for im in im_list]
@@ -521,11 +526,291 @@ class ViewDBCutVideos(OCVVideoThread):
                                   for x in self.curr_sample_angles.iterrows()}
 
 
+class View2VideoDB(OCVVideoThread):
+    def __init__(self, all_videos_df_path, libras_corpus_db_path, vid_sync, front_view_db_path,
+                 all_persons_from_subtitle, th_list, th_slider):
+        super().__init__()
+        self.curr_samples_list = th_list
+        self.time_slider = th_slider
+        self.all_videos = all_videos_df_path if isinstance(all_videos_df_path, pd.DataFrame) \
+                                             else pd.read_csv(all_videos_df_path)
+
+        self.front_view_db_path = front_view_db_path
+        self.vid_sync = vid_sync if isinstance(vid_sync, pd.DataFrame) else pd.read_csv(vid_sync)
+        self.all_v_parts = sorted(self.vid_sync.v_part.unique().tolist(), reverse=True)
+        self.all_persons_from_subtitle = all_persons_from_subtitle if isinstance(vid_sync, pd.DataFrame) \
+                                                                   else pd.read_csv(all_persons_from_subtitle)
+
+        self._all_samples_name, self.cls_dirs = DBLoader2NPY.read_all_db_folders(db_path=front_view_db_path,
+                                                                                 only_that_classes=None,
+                                                                                 angle_or_xy='xy-hands',
+                                                                                 custom_internal_dir='')
+        self.curr_folder_idx = 0
+        self.curr_sample_idx = 0
+        self.curr_video_idx = 0
+        self.cap = None
+        self.db_path = libras_corpus_db_path
+        self.curr_frame_time_sec = None
+        self.curr_frame_time_ms = None
+        self.all_samples_path_from_video = None
+        self.curr_sample_idx = 0
+        self.memory_angle_plot = {}
+        self.color_map = {}
+        self.save_fig = False
+        self.frame_angle = None
+        self.could_no_reset_cap = False
+        self.last_frame = None
+
+        self.joints_angle_2_use = [
+            'Neck-RShoulder-RElbow',
+            'RShoulder-RElbow-RWrist',
+            'Neck-LShoulder-LElbow',
+            'LShoulder-LElbow-LWrist',
+            'RShoulder-Neck-LShoulder',
+            'left-Wrist-left-ThumbProximal-left-ThumbDistal',
+            'right-Wrist-right-ThumbProximal-right-ThumbDistal',
+            'left-Wrist-left-IndexFingerProximal-left-IndexFingerDistal',
+            'right-Wrist-right-IndexFingerProximal-right-IndexFingerDistal',
+            'left-Wrist-left-MiddleFingerProximal-left-MiddleFingerDistal',
+            'right-Wrist-right-MiddleFingerProximal-right-MiddleFingerDistal',
+            'left-Wrist-left-RingFingerProximal-left-RingFingerDistal',
+            'right-Wrist-right-RingFingerProximal-right-RingFingerDistal',
+            'left-Wrist-left-LittleFingerProximal-left-LittleFingerDistal',
+            'right-Wrist-right-LittleFingerProximal-right-LittleFingerDistal'
+        ]
+
+        self.color_array = ['#e53242', '#ffb133', '#3454da', '#ddc3d0', '#005a87', '#df6722', '#00ffff',
+                            '#b7b7b7', '#ddba95', '#ffb133', '#4b5c09', '#00ff9f', '#e2f4c7', '#a2798f',
+                            '#8caba8', '#ffb3ba', '#ffdfba', '#ffffba', '#baffc9', '#ff8000', '#8f139f']
+
+        for x in self.joints_angle_2_use:
+            if x not in self.color_map:
+                for col in self.color_array:
+                    if col not in self.color_map.values():
+                        self.color_map.update({x: col})
+
+        self.video_mutex = QMutex()
+        self.joint_db_mutex = QMutex()
+
+        self.curr_sample_joints = None
+        self.curr_sample_angles = None
+
+    def read_cur_video(self):
+        ret, frame = None, None
+
+        if self.cap is None:
+            video_path = self._set_video_name_from_curr_sample()
+
+            if self.video_mutex.tryLock():
+                self.cap = cv2.VideoCapture(video_path)
+                self.curr_frame_time_sec = (1000 / 30) / 1000 \
+                    if self.curr_frame_time_sec is None else self.curr_frame_time_sec
+
+                self.curr_frame_time_ms = 1000 / self.cap.get(cv2.CAP_PROP_FPS)
+                self.video_mutex.unlock()
+
+            self.__reset_cap()
+
+        else:
+            curr_frame_pos = None
+
+            if self.could_no_reset_cap:
+                self.__reset_cap()
+
+            if self.video_mutex.tryLock():
+                curr_opts = self._get_opts_from_curr_vid()
+                time.sleep(self.curr_frame_time_sec)
+                ret, frame = self.cap.read()
+                curr_frame_pos = self.cap.get(cv2.CAP_PROP_POS_FRAMES)
+                curr_msec_pos = self.cap.get(cv2.CAP_PROP_POS_MSEC)
+                if curr_frame_pos >= (curr_opts['end'] // self.curr_frame_time_ms):
+                    self.cap.set(cv2.CAP_PROP_POS_FRAMES, curr_opts['beg'] // self.curr_frame_time_ms)
+                self.video_mutex.unlock()
+
+            if ret is None and frame is None:
+                return True, self.last_frame
+
+            if not ret:
+                raise RuntimeError(f'bad video {self.all_videos_path[self.curr_video_idx]}')
+
+            self.__write_joints_2_im(frame, curr_msec_pos)
+
+            frame = cv2.resize(frame, (1920, 1080))
+            self.__write_info_2_im(frame, font_scale=1)
+
+            if self.frame_angle is not None:
+                frame = self.hconcat_resize_min([frame, self.frame_angle])
+
+        self.last_frame = frame
+        return ret, frame
+
+    def _set_video_name_from_curr_sample(self):
+        curr_opts = self._get_opts_from_curr_vid()
+        vid_path, vid_name = ExtractMultipleVideos.read_vid_path_from_vpart(curr_opts['curr_folder'],
+                                                                            curr_opts['talker_id'])
+        return vid_path
+
+    @staticmethod
+    def hex_2_rgb(h):
+        h = h[1:]
+        return tuple(int(h[i:i + 2], 16) for i in (0, 2, 4))
+
+    @staticmethod
+    def hconcat_resize_min(im_list, interpolation=cv2.INTER_CUBIC):
+        h_max = max(im.shape[0] for im in im_list)
+        im_list_resize = [cv2.resize(im, (int(im.shape[1] * h_max / im.shape[0]), h_max), interpolation=interpolation)
+                          for im in im_list]
+        return cv2.hconcat(im_list_resize)
+
+    def change_to_sample_idx(self, idx):
+        self.curr_sample_idx = idx
+        self.__reset_cap_position()
+
+    def prev_sample(self):
+        self.curr_sample_idx = self.curr_sample_idx - 1 if self.curr_sample_idx != 0 \
+            else len(self.all_samples_path_from_video)
+        self.__reset_cap_position()
+
+    def next_sample(self):
+        self.curr_sample_idx = self.curr_sample_idx + 1 \
+            if self.curr_sample_idx < len(self._all_samples_name) - 1 else 0
+        self.__reset_cap()
+
+    def prev_vid(self):
+        self.curr_video_idx = self.curr_video_idx - 1 if self.curr_video_idx != 0 else len(self.all_videos_path) - 1
+        self.__update_videos_n_paths()
+
+    def next_vid(self):
+        self.curr_video_idx = self.curr_video_idx + 1 if self.curr_video_idx < len(self.all_videos_path) - 1 else 0
+        self.__update_videos_n_paths()
+
+    def _get_opts_from_curr_vid(self):
+        curr_opts_list = self._all_samples_name[self.curr_sample_idx][0].replace('\\', '/').split('/')[-1].split('---')
+
+        v_part = int(curr_opts_list[0])
+        talker_id = int(curr_opts_list[-1][0])
+        folder = self.all_persons_from_subtitle[self.all_persons_from_subtitle.v_part == v_part].folder_name.values[0]
+        curr_folder_path = os.path.join(self.db_path, folder)
+        beg = int(curr_opts_list[2])
+        end = int(curr_opts_list[3])
+        sign = curr_opts_list[1]
+
+        return dict(
+            v_part=v_part,
+            talker_id=talker_id,
+            curr_folder=curr_folder_path,
+            beg=beg,
+            end=end,
+            sign=sign
+        )
+
+    def __reset_cap(self):
+        self.curr_sample_joints = pd.read_csv(self._all_samples_name[self.curr_sample_idx][0])
+        self.curr_sample_joints = self.curr_sample_joints.applymap(PoseCentroidTracker.parse_npy_vec_str)
+        cur_opts = self._get_opts_from_curr_vid()
+        if self.video_mutex.tryLock():
+            succ = self.cap.set(cv2.CAP_PROP_POS_FRAMES, cur_opts['beg'] // self.curr_frame_time_ms)
+            self.video_mutex.unlock()
+            self.could_no_reset_cap = False
+            if not succ:
+                raise RuntimeError(f'Could not set frame pos')
+        else:
+            self.could_no_reset_cap = True
+
+    def __update_videos_n_paths(self):
+
+        curr_opts_list = self._all_samples_name[self.curr_sample_idx][0].replace('\\', '/').split('/')[-1].split('---')
+        self.all_samples_path_from_video = list(filter(lambda x: 'sample' in x, os.listdir(video_path)))
+        for it, sample_name in enumerate(self.all_samples_path_from_video):
+            name_to_add = ''.join(sample_name.split('-')[-5:]) + ' ' + str(it)
+            self.curr_samples_list.addItem(name_to_add)
+
+        if self.cap is not None:
+            self.cap.release()
+
+    @staticmethod
+    def __convert_msec_2_hour_text(ms):
+        ms = int(ms)
+        seconds = (ms / 1000) % 60
+        milisec = (seconds % 1) * 1000
+        seconds = int(seconds)
+        minutes = (ms / (1000 * 60)) % 60
+        minutes = int(minutes)
+        hours = (ms / (1000 * 60 * 60)) % 24
+        return '%d: %d: %d: %d' % (hours, minutes, seconds, milisec)
+
+    def __write_info_2_im(self, im, font_scale=0.3):
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        bottom_left_corner_of_text = (10, 200)
+        font_color = (255, 255, 255)
+        line_type = 2
+
+        curr_opts = self._get_opts_from_curr_vid()
+        for it, opt in enumerate(curr_opts.items()):
+            text = str(opt[1]) if not isinstance(opt[1], float) else self.__convert_msec_2_hour_text(opt[1])
+            cv2.putText(im, text,
+                        (bottom_left_corner_of_text[0], bottom_left_corner_of_text[1] + it * 40),
+                        font,
+                        font_scale,
+                        font_color,
+                        line_type)
+
+    def __write_joints_2_im(self, im, frame_pos, radius=2, color=(255, 0, 255)):
+        frame_search_res = self.curr_sample_joints.frame == int(frame_pos)
+        if not any(frame_search_res.values):
+            return
+
+        joints_used = []
+        for k in self.joints_angle_2_use:
+            keys = k.split('-')
+            if 'left' in keys or 'right' in keys:
+                keys = [keys[0] + '-' + keys[1],
+                        keys[2] + '-' + keys[3],
+                        keys[4] + '-' + keys[5]]
+
+            joints_used.extend(keys)
+
+        joints_at_frame = self.curr_sample_joints[frame_search_res]
+        for joint_name in joints_used:
+            joint = joints_at_frame[joint_name].values[0]
+            try:
+                cv2.circle(im, tuple(map(int, joint[:2])), radius, color, 1)
+            except BaseException:
+                continue
+
+        joints_at_frame_df = self.curr_sample_joints[frame_search_res]
+        for key in self.joints_angle_2_use:
+            keys = key.split('-')
+            if 'left' in keys or 'right' in keys:
+                keys = [keys[0] + '-' + keys[1],
+                        keys[2] + '-' + keys[3],
+                        keys[4] + '-' + keys[5]]
+
+            color = self.hex_2_rgb(self.color_map[key])
+            joint_0 = joints_at_frame_df[keys[0]].values[0][:2]
+            joint_1 = joints_at_frame_df[keys[1]].values[0][:2]
+            joint_2 = joints_at_frame_df[keys[2]].values[0][:2]
+
+            joint_0_acc = joints_at_frame_df[keys[0]].values[0][2]
+            joint_1_acc = joints_at_frame_df[keys[1]].values[0][2]
+            joint_2_acc = joints_at_frame_df[keys[2]].values[0][2]
+
+            # if joint_0_acc < 0.4 or joint_1_acc < 0.4 or joint_2_acc < 0.4:
+            #     continue
+
+            try:
+                cv2.line(im, tuple(map(int, joint_1)), tuple(map(int, joint_0)), color=color)
+                cv2.line(im, tuple(map(int, joint_1)), tuple(map(int, joint_2)), color=color)
+            except BaseException:
+                continue
+
+
 if __name__ == '__main__':
     app = QApplication(sys.argv)
 
-    w = App(th_cls=ViewDBCutVideos, all_videos_df_path='all_videos.csv', db_path='D:/gdrive/LibrasCorpus',
-            angle_db='../libras-db-folders')
+    w = App(th_cls=View2VideoDB, all_videos_df_path='all_videos.csv', libras_corpus_db_path='D:/gdrive/',
+            front_view_db_path='../sign_db_front_view', vid_sync='vid_sync.csv',
+            all_persons_from_subtitle='all_persons_from_subtitle.csv')
     w.show()
 
     sys.exit(app.exec_())

@@ -42,7 +42,8 @@ class PoseCentroidTracker:
 
         self.curr_dt = None
         self.signaler_find = FindSignalingCentroid(all_video_csv_path)
-        self.pose_extractor = OpenposeExtractor(openpose_path=openpose_path)
+        self.pose_extractor = OpenposeExtractor(openpose_path=openpose_path) if isinstance(openpose_path, str) \
+                                                                             else openpose_path
         self.person_2_sign = DataframePerson2Sign(None)
 
         self.centroids_df = pd.read_csv(centroids_df_path) \
