@@ -198,7 +198,6 @@ class AllEAFParser2CSV:
         path_2_all_videos = os.path.join(path_to_save_sign_df, '../all_videos.csv')
         libras_df.to_csv(path_2_all_videos, index=False)
 
-
     def remove_db_df_path_specific(self, df):
         """
 

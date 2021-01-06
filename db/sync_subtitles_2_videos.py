@@ -51,6 +51,9 @@ class SyncSubtitles2Videos:
             f_path = os.path.join(self.db_path, f)
             v_part = f.split(' v')[-1]
 
+            if int(v_part) not in [340]:
+                continue
+
             video_path = self.__find_video_in_folder_by_num(f_path, 1)
             video_path = os.path.join(f_path, video_path)
 
@@ -59,6 +62,10 @@ class SyncSubtitles2Videos:
 
             signaling_1_quiet_moments = self.__find_where_signaling_is_quiet(f, 1)
             signaling_2_quiet_moments = self.__find_where_signaling_is_quiet(f, 2)
+
+            # TODO:
+            # - checar se ambos ficam calados
+            # - Remover locais que ambos ficam calados.
 
             if signaling_1_quiet_moments is None and signaling_2_quiet_moments is None:
                 continue
@@ -78,6 +85,16 @@ class SyncSubtitles2Videos:
                 curr_beg_pos = self.all_videos[self.all_videos.folder == f].beg.min()
                 signaling_2_quiet_moments = [dict(beg=curr_beg_pos, end=curr_beg_pos + 5000)]
 
+            if len(signaling_1_quiet_moments) == 0:
+                curr_signaler_quiet = 1
+                curr_beg_pos = self.all_videos[self.all_videos.folder == f].beg.min()
+                curr_end_pos = self.all_videos[self.all_videos.folder == f].end.max()
+                signaling_1_quiet_moments = [dict(beg=curr_beg_pos, end=curr_end_pos)]
+            elif len(signaling_2_quiet_moments) == 0:
+                curr_signaler_quiet = 2
+                curr_beg_pos = self.all_videos[self.all_videos.folder == f].beg.min()
+                curr_end_pos = self.all_videos[self.all_videos.folder == f].end.max()
+                signaling_2_quiet_moments = [dict(beg=curr_beg_pos, end=curr_end_pos)]
 
             quiet_to_send = signaling_1_quiet_moments if curr_signaler_quiet == 1 else signaling_2_quiet_moments
             res = self.__find_left_signaling_in_single_video(vid, quiet_to_send, debug_frame=False)
@@ -574,8 +591,10 @@ class SyncSubtitles2Videos:
 
 
 if __name__ == '__main__':
-    sync_vid_db = SyncSubtitles2Videos('all_videos.csv',
-                                       '/media/usuario/Others/gdrive/')
+    sync_vid_db = SyncSubtitles2Videos(all_videos='all_videos.csv',
+                                       db_path='D:/gdrive/' # Windows
+                                       # db_path='/media/usuario/Others/gdrive/' # Linux
+                                       )
     #sync_vid_db.process_all_folders_2_sync_with_person_2_video()
     persons_sub_df = sync_vid_db.find_all_left_signaler()
 
