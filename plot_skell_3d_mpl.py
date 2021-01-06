@@ -11,8 +11,8 @@ from matplotlib import cm
 from mpl_toolkits.mplot3d.axes3d import Axes3D, get_test_data
 from matplotlib.widgets import Slider, Button, RadioButtons
 
-front_data_path = 'v1098_barely_front_view_lef_person.csv'
-side_data_path = 'v0180_side_view_lef_person.csv'
+front_data_path = 'v1098_barely_front_view_left_person.csv'
+side_data_path = 'v1098_side_view_left_person.csv'
 #destination_path = f'./{person}_person_3d_{version}.csv'
 
 left_front_data = pd.read_csv(front_data_path)
