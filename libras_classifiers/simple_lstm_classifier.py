@@ -1,11 +1,16 @@
-import sys
-import os
+# %%
+import tensorflow as tf
+physical_devices = tf.config.list_physical_devices('GPU')
+tf.config.experimental.set_memory_growth(physical_devices[0], enable=True)
 from libras_classifiers.librasdb_loaders import DBLoader2NPY
+# %%
+import sys
+import seaborn as sns
+import os
 from tqdm import tqdm
 from itertools import combinations
 from sklearn.preprocessing import StandardScaler
 import numpy as np
-import tensorflow as tf
 import argparse
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -21,7 +26,7 @@ early_stopper = tf.keras.callbacks.EarlyStopping(
     baseline=None,
     restore_best_weights=True,
 )
-batch_size = 100
+batch_size = 90
 joints_to_use = ['frame',
                  'Neck-RShoulder-RElbow',
                  'RShoulder-RElbow-RWrist',
@@ -245,11 +250,10 @@ def make_base_classifier(net, pose_db, pose, amount_lstm, lstm_1_units, lstm_2_u
         net.compile(optimizer='Adam',
                     loss='categorical_crossentropy',
                     metrics=['accuracy'])
-        net.summary()
     except ValueError as e:
         print(e)
 
-    fit_res = net.fit(pose_db.train(), epochs=epochs, verbose=0, shuffle=False, workers=2,
+    fit_res = net.fit(pose_db.train(), epochs=epochs, verbose=0, shuffle=False, workers=1,
                       callbacks=[early_stopper], validation_data=pose_db.validation())
 
     cnn_str_params = f'CNN Kernel {cnn_kernel} Filters {cnn_1_filters} {cnn_2_filters}' \
@@ -379,7 +383,9 @@ df_exp = pd.read_csv(exp_path + csv_xy_no_dense_name) \
 
 save_header = df_exp.shape[0] == 0
 
+it = df_exp.shape[0] - 1
 for param in tqdm(all_params_product):
+    it += 1
     if df_exp.shape[0] != 0:
         if str(param) in df_exp.exp_name.unique().tolist():
             continue
@@ -388,6 +394,7 @@ for param in tqdm(all_params_product):
     try:
         acc_pdf_file, loss_pdf_file, history = train_lstm_xy_pose('xy-pose',dense_units=None, **param)
     except:
+        print(f'got error with -> {param} {it}')
         continue
 
     pd.DataFrame(dict(
@@ -477,6 +484,7 @@ csv_xy_cnn_name = 'all_experiments_pose_xy_cnn_batch1.csv'
 df_exp = pd.read_csv(exp_path + csv_xy_cnn_name) if os.path.exists(exp_path + csv_xy_cnn_name) else pd.DataFrame()
 
 save_header = df_exp.shape[0] == 0
+done = 0
 for param in tqdm(all_params_product):
     if df_exp.shape[0] != 0:
         if str(param) in df_exp.exp_name.unique().tolist():
@@ -503,4 +511,82 @@ for param in tqdm(all_params_product):
     )).to_csv(exp_path + csv_xy_cnn_name, mode='a', header=save_header)
     save_header = False
 # %%
+
+exp_path = '../'
+pose_xy = 'all_experiments_pose_xy_batch1.csv'
+pose_angle= 'all_experiments_pose_angle_batch1.csv'
+csv_angle_name_no_dense = 'all_experiments_pose_angle_no_dense_derivatives_batch1.csv'
+csv_angle_name_no_dense_no_dt = 'all_experiments_pose_angle_no_dense_no_derivatives_batch1.csv'
+csv_xy_no_dense_name = 'all_experiments_pose_xy_no_dense_batch1.csv'
+csv_xy_cnn_name = 'all_experiments_pose_xy_cnn_batch1.csv'
+
+
+pose_angle_df = pd.read_csv(exp_path + pose_angle)
+pose_angle_no_dt_no_dense_df = pd.read_csv(exp_path + csv_angle_name_no_dense)
+pose_angle_no_dt_df = pd.read_csv(exp_path + csv_angle_name_no_dense_no_dt)
+
+pose_xy_df = pd.read_csv(exp_path + pose_xy)
+pose_xy_no_dense = pd.read_csv(exp_path + csv_xy_no_dense_name)
+pose_xy_cnn = pd.read_csv(exp_path + csv_xy_cnn_name)
+
+# %%
+def make_subplot(df, name):
+    val_acc = list(map(float, df.val_acc.tolist()))
+    val_ = ['val_acc'] * len(val_acc)
+
+    network = list(map(str, df.exp_name.tolist())) + \
+              list(map(str, df.exp_name.tolist()))
+
+    dropout = list(map(float, df.dropout.tolist())) + \
+              list(map(float, df.dropout.tolist()))
+
+    recurrent_dropout = list(map(float, df.dropout_recurrent.tolist())) + \
+                        list(map(float, df.dropout_recurrent.tolist()))
+
+    acc = list(map(float, df.acc.tolist()))
+    acc_ = ['acc'] * len(acc)
+
+    acc_kind = val_ + acc_
+    all_acc = val_acc + acc
+
+    exp_names = [name] * len(acc_kind)
+
+    return pd.DataFrame(dict(
+        all_acc=all_acc, acc_kind=acc_kind, exp_names=exp_names,
+        network=network
+    ))
+
+
+all_df = pd.DataFrame()
+all_df = all_df.append(make_subplot(pose_angle_df, 'pose_angle'))
+all_df = all_df.append(make_subplot(pose_angle_no_dt_no_dense_df, 'pose_angle_no_dt_no_dense'))
+all_df = all_df.append(make_subplot(pose_angle_no_dt_df, 'pose_angle_no_dt'))
+all_df = all_df.append(make_subplot(pose_xy_df, 'pose_xy'))
+all_df = all_df.append(make_subplot(pose_xy_no_dense, 'pose_no_dense'))
+all_df = all_df.append(make_subplot(pose_xy_cnn, 'pose_cnn'))
+
+# %%
+
+plt.figure(dpi=720//9, figsize=(21, 9))
+chart = sns.violinplot(x='exp_names', y='all_acc', hue='acc_kind', data=all_df)
+chart.set_xticklabels(labels=chart.get_xticklabels(), rotation=90)
+plt.show()
+
+ax = sns.barplot(x='exp_names', y='all_acc', hue='acc_kind', data=all_df)
+plt.show()
+
+# %% qual a melhor rede de cada experimento.
+
+amount_best_acc = 5
+
+all_exp_names = all_df.exp_names.unique().tolist()
+all_exp_best_accs = []
+for exp_name in all_exp_names:
+    exp = all_df[all_df['exp_names'] == exp_name].sort_values(by='all_acc', ascending=False)
+    exp_acc = exp[exp['acc_kind'] == 'acc']
+    curr_acc = exp_acc.iloc[0:amount_best_acc]
+    for idx, row in curr_acc.iterrows():
+        curr_val_acc = exp[(exp['acc_kind'] == 'val_acc') &
+                           (exp['network'] == row.network)]
+        all_exp_best_accs.append((row, curr_val_acc))
 

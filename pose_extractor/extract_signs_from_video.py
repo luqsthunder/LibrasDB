@@ -29,8 +29,8 @@ def process_single_sample(extractor, curr_video, beg, end, person_needed_id, pos
         raise RuntimeError(f'Could not set video position')
 
     df_cols = ['frame'] + all_parts.BODY_PARTS_NAMES + \
-              ['left_' + x for x in all_parts.HAND_PARTS] + \
-              ['right_' + x for x in all_parts.HAND_PARTS]
+              ['left-' + x for x in all_parts.HAND_PARTS] + \
+              ['right-' + x for x in all_parts.HAND_PARTS]
 
     video_df = pd.DataFrame(columns=df_cols)
 
@@ -57,9 +57,10 @@ def process_single_sample(extractor, curr_video, beg, end, person_needed_id, pos
             first_x_mid = x_mid_point / len(curr_centroids)
 
         curr_frame_pos = int(curr_video.get(cv.CAP_PROP_POS_FRAMES))
+        curr_msec_pos = int(curr_video.get(cv.CAP_PROP_POS_MSEC))
         left_sorted_persons = pose_tracker.filter_persons_by_x_mid(dt, first_x_mid)
         video_df = update_xy_pose_df_single_person(dt, video_df,
-                                                   curr_frame_pos,
+                                                   curr_msec_pos,
                                                    left_sorted_persons[real_id_if_sorted][0],
                                                    left_sorted_persons[real_id_if_sorted][1],
                                                    pose_tracker.body_parts,

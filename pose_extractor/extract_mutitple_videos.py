@@ -51,11 +51,13 @@ class ExtractMultipleVideos:
         self.pose_centroid_tracker = PoseCentroidTracker(all_videos, all_videos, openpose_path=self.extractor,
                                                          centroids_df_path='centroids.csv')
 
-        self.needed_sings = needed_signs_list
+        self.needed_sings = needed_signs_list if needed_signs_list is not None \
+            else self.all_videos.signs.unique().tolist()
         self.path_to_save_dfs = path_to_save_dfs
 
     def process(self):
         """
+        Extrai os sinais de todos os videos.
 
         Returns
         -------
@@ -72,7 +74,7 @@ class ExtractMultipleVideos:
                 folder_path = os.path.join(self.path_to_save_dfs, sign_df['sign_name'])
                 os.makedirs(folder_path, exist_ok=True)
                 file_name = f'{v_part}---{sign_df["sign_name"]}---{sign_df["beg"]}---{sign_df["end"]}---' \
-                            f'{sign_df["talker_id"]}.csv'
+                            f'{sign_df["view"]}---{sign_df["talker_id"]}.csv'
                 csv_file_path = os.path.join(folder_path, file_name)
 
                 sign_df['df'].to_csv(csv_file_path)
@@ -113,27 +115,40 @@ class ExtractMultipleVideos:
             sign_row = sign_row[1]
 
             folder_path = os.path.join(self.path_to_save_dfs, sign_row.sign)
-            file_name = f'{v_part}---{sign_row.sign}---{sign_row.beg}---{sign_row.end}---' \
-                        f'{sign_row.talker_id}.csv'
-            file_path = os.path.join(folder_path, file_name)
-            if os.path.exists(file_path):
-                continue
+            front_file_name = f'{v_part}---{sign_row.sign}---{sign_row.beg}---{sign_row.end}---' \
+                              f'front---{sign_row.talker_id}.csv'
 
+            side_file_name = f'{v_part}---{sign_row.sign}---{sign_row.beg}---{sign_row.end}---' \
+                             f'side---{sign_row.talker_id}.csv'
+
+            front_file_path = os.path.join(folder_path, front_file_name)
+            side_file_path = os.path.join(folder_path, side_file_name)
             # achar quem sinaliza, se ta no video 1 ou no 2 e extrair.
             is_left = sign_row.talker_id == lf_id_subtitle
-            curr_sign_pose_df = self.__extract_sings_from_single_person_video(
-                beg_msec=sign_row.beg,
-                end_msec=sign_row.end,
-                v_part=v_part,
-                is_left=is_left,
-                enable_debug=False
-            )
 
-            if curr_sign_pose_df is None:
-                continue
+            if not os.path.exists(front_file_path):
+                curr_sign_pose_df = self.__extract_sings_from_single_person_video(
+                    beg_msec=sign_row.beg,
+                    end_msec=sign_row.end,
+                    v_part=v_part,
+                    is_left=is_left,
+                    enable_debug=False
+                )
 
-            all_signs_pose_df.append(dict(df=curr_sign_pose_df, sign_name=sign_row.sign, beg=sign_row.beg,
-                                          end=sign_row.end, talker_id=sign_row.talker_id))
+                if curr_sign_pose_df is not None:
+                    all_signs_pose_df.append(dict(df=curr_sign_pose_df, sign_name=sign_row.sign, beg=sign_row.beg,
+                                                  end=sign_row.end, talker_id=sign_row.talker_id, view='side'))
+            if not os.path.exists(side_file_path):
+                curr_sign_pose_df = self.__extract_sign_from_video_with_2_person(
+                    beg_msec=sign_row.beg,
+                    end_msec=sign_row.end,
+                    v_part=v_part,
+                    is_left=is_left
+                )
+
+                if curr_sign_pose_df is not None:
+                    all_signs_pose_df.append(dict(df=curr_sign_pose_df, sign_name=sign_row.sign, beg=sign_row.beg,
+                                                  end=sign_row.end, talker_id=sign_row.talker_id, view='front'))
 
         return all_signs_pose_df
 
