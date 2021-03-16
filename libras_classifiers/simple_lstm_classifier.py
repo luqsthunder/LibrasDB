@@ -3,6 +3,7 @@ import tensorflow as tf
 physical_devices = tf.config.list_physical_devices('GPU')
 tf.config.experimental.set_memory_growth(physical_devices[0], enable=True)
 from libras_classifiers.librasdb_loaders import DBLoader2NPY
+from tensorflow.keras.utils import plot_model
 # %%
 import sys
 import seaborn as sns
@@ -15,6 +16,8 @@ import argparse
 import matplotlib.pyplot as plt
 import pandas as pd
 import itertools
+import subprocess
+import matplotlib
 
 # %%
 early_stopper = tf.keras.callbacks.EarlyStopping(
@@ -253,8 +256,10 @@ def make_base_classifier(net, pose_db, pose, amount_lstm, lstm_1_units, lstm_2_u
     except ValueError as e:
         print(e)
 
+    # fit_res = None
     fit_res = net.fit(pose_db.train(), epochs=epochs, verbose=0, shuffle=False, workers=1,
                       callbacks=[early_stopper], validation_data=pose_db.validation())
+    # net.save('model.h5')
 
     cnn_str_params = f'CNN Kernel {cnn_kernel} Filters {cnn_1_filters} {cnn_2_filters}' \
                      if cnn_kernel is not None and cnn_1_filters is not None and cnn_2_filters is not None else ''
@@ -266,8 +271,57 @@ def make_base_classifier(net, pose_db, pose, amount_lstm, lstm_1_units, lstm_2_u
                 f'drop {dropout} rdrop {dropout_recurrent} dense {dense_units}' + cnn_str_params
 
     base_folder = '../../first_batch_figs/'
-    save_pdf_fig(fit_res.history, base_folder, acc_name, loss_name)
+    # save_pdf_fig(fit_res.history, base_folder, acc_name, loss_name)
     return base_folder + acc_name + '.pdf', base_folder + loss_name + '.pdf', fit_res.history
+
+# %%
+
+########################################################################################################################
+
+# pose angulo, com densas, sem derivadas
+dt_pose = dict(
+    dense_units=[90, 45],
+    amount_lstm=[1, 2, 3],
+    lstm_1_units=[90, 45],
+    lstm_2_units=[30, 20],
+    lstm_3_units=[15, 10],
+    dropout=[0.0, 0.35],
+    dropout_recurrent=[0.0, 0.35],
+)
+
+keys, vals = zip(*dt_pose.items())
+all_params_product = [{key: x[it] for it, key in enumerate(keys)} for x in list(itertools.product(*vals))]
+
+exp_path = '../'
+csv_angle_name = 'all_experiments_pose_angle_dense_no_derivatives_batch1.csv'
+
+df_exp = pd.read_csv(exp_path + csv_angle_name) if os.path.exists(exp_path + csv_angle_name) else pd.DataFrame()
+
+save_header = df_exp.shape[0] == 0
+for param in tqdm(all_params_product):
+    if df_exp.shape[0] != 0:
+        if str(param) in df_exp.exp_name.unique().tolist():
+            continue
+
+    tf.keras.backend.clear_session()
+    acc_pdf_file, loss_pdf_file, history = train_angle_lstm('angle-dense-no-derivate', use_derivative=False, **param)
+
+    pd.DataFrame(dict(
+        exp_name=[str(param)],
+        acc=[np.max(history['accuracy'])],
+        val_acc=[np.max(history['val_accuracy'])],
+        best_epoch_acc=[np.argmax(history['accuracy'])],
+        best_epoch_val_acc=[np.argmax(history['val_accuracy'])],
+        dense_units=[0],
+        amount_lstm=[param['amount_lstm']],
+        lstm_1_units=[param['lstm_1_units']],
+        lstm_2_units=[param['lstm_2_units']],
+        lstm_3_units=[param['lstm_3_units']],
+        dropout=[param['dropout']],
+        dropout_recurrent=[param['dropout_recurrent']],
+    )).to_csv(exp_path + csv_angle_name, mode='a', header=save_header)
+    save_header = False
+
 
 # %%
 
@@ -514,23 +568,27 @@ for param in tqdm(all_params_product):
 
 exp_path = '../'
 pose_xy = 'all_experiments_pose_xy_batch1.csv'
-pose_angle= 'all_experiments_pose_angle_batch1.csv'
-csv_angle_name_no_dense = 'all_experiments_pose_angle_no_dense_derivatives_batch1.csv'
+pose_angle = 'all_experiments_pose_angle_batch1.csv' # pose em angulo + derivadas + densa
+csv_angle_name_no_dense = 'all_experiments_pose_angle_no_dense_derivatives_batch1.csv' # pose em angulo + derivadas - densa
 csv_angle_name_no_dense_no_dt = 'all_experiments_pose_angle_no_dense_no_derivatives_batch1.csv'
+
 csv_xy_no_dense_name = 'all_experiments_pose_xy_no_dense_batch1.csv'
 csv_xy_cnn_name = 'all_experiments_pose_xy_cnn_batch1.csv'
 
+pose_angle_df = pd.read_csv(exp_path + pose_angle) # pose em angulo + derivadas + densa
+pose_angle_dt_no_dense_df = pd.read_csv(exp_path + csv_angle_name_no_dense) # pose em angulo + derivadas - densa
+pose_angle_no_dt_no_dense_df = pd.read_csv(exp_path + csv_angle_name_no_dense_no_dt)
 
-pose_angle_df = pd.read_csv(exp_path + pose_angle)
-pose_angle_no_dt_no_dense_df = pd.read_csv(exp_path + csv_angle_name_no_dense)
-pose_angle_no_dt_df = pd.read_csv(exp_path + csv_angle_name_no_dense_no_dt)
+pose_angle_no_dt_dense_df = pose_angle_no_dt_no_dense_df[pose_angle_no_dt_no_dense_df.dense_units.isna()].reset_index()
+pose_angle_no_dt_no_dense_df = pose_angle_no_dt_no_dense_df.dropna()
 
 pose_xy_df = pd.read_csv(exp_path + pose_xy)
 pose_xy_no_dense = pd.read_csv(exp_path + csv_xy_no_dense_name)
 pose_xy_cnn = pd.read_csv(exp_path + csv_xy_cnn_name)
 
+
 # %%
-def make_subplot(df, name):
+def make_subplot(df, name, desc=None):
     val_acc = list(map(float, df.val_acc.tolist()))
     val_ = ['val_acc'] * len(val_acc)
 
@@ -551,19 +609,58 @@ def make_subplot(df, name):
 
     exp_names = [name] * len(acc_kind)
 
+    list_desc = [desc] * len(acc_kind)
+
     return pd.DataFrame(dict(
         all_acc=all_acc, acc_kind=acc_kind, exp_names=exp_names,
-        network=network
+        network=network, desc=list_desc
     ))
 
 
+"""
+pose em angulo + derivadas + densa ok
+pose em angulo + derivadas - densa ok
+pose em angulo - derivadas + densa 
+pose em angulo - derivadas - densa ok
+
+pose cartesiana + densa 
+pose cartesiana 
+pose cartesiana + cnn
+
+"""
+
 all_df = pd.DataFrame()
-all_df = all_df.append(make_subplot(pose_angle_df, 'pose_angle'))
-all_df = all_df.append(make_subplot(pose_angle_no_dt_no_dense_df, 'pose_angle_no_dt_no_dense'))
-all_df = all_df.append(make_subplot(pose_angle_no_dt_df, 'pose_angle_no_dt'))
-all_df = all_df.append(make_subplot(pose_xy_df, 'pose_xy'))
-all_df = all_df.append(make_subplot(pose_xy_no_dense, 'pose_no_dense'))
-all_df = all_df.append(make_subplot(pose_xy_cnn, 'pose_cnn'))
+all_df = all_df.append(make_subplot(pose_angle_df, 'pose_angle_dt_dense',
+                                    desc='OJATD + $b_2$'
+                                    #desc='Oriented angles with time derivatives and dense layer.'
+                                    ))
+
+all_df = all_df.append(make_subplot(pose_angle_dt_no_dense_df, 'pose_angle_no_dt_no_dense',
+                                    desc='OJA + $b_1$'
+                                    #desc='Oriented angles without time derivatives and without dense layers.'
+                                    ))
+
+all_df = all_df.append(make_subplot(pose_angle_no_dt_no_dense_df, 'pose_angle_no_dt_dense',
+                                    desc='OJATD + $b_2$'
+                                    #desc='Oriented angles without time derivatives and with dense layer.'
+                                    ))
+
+all_df = all_df.append(make_subplot(pose_xy_df, 'pose_xy',
+                                    desc='NCC + $b_2$'
+                                    #desc='Cartesian pose with only lstms'
+                                    ))
+all_df = all_df.append(make_subplot(pose_xy_no_dense, 'pose_xy_no_dense',
+                                    desc='NCC + $b_1$'
+                                    #desc='Cartesian pose with dense layer'
+                                    ))
+all_df = all_df.append(make_subplot(pose_xy_cnn, 'pose_cnn',
+                                    desc='NCC + $b_3$'
+                                    #desc='Cartesian pose with 1D Convolution layers.'
+                                    ))
+
+# %%
+only_val_acc = all_df[all_df['acc_kind']=='val_acc']
+
 
 # %%
 
@@ -590,3 +687,74 @@ for exp_name in all_exp_names:
                            (exp['network'] == row.network)]
         all_exp_best_accs.append((row, curr_val_acc))
 
+# %%
+only_val_acc = all_df[all_df['acc_kind'] == 'val_acc']
+best_5 = only_val_acc.sort_values(by=['all_acc'], ascending=False).iloc[:5]
+for row_index, acc_row in best_5.iterrows():
+    print(acc_row.network, acc_row.all_acc)
+
+
+# %%
+sorted_experiments = all_df[all_df['acc_kind'] == 'val_acc']
+sorted_experiments = sorted_experiments.sort_values(by=['all_acc'])
+experiment_amount_single = all_df[all_df['exp_names'] == 'pose_angle'].exp_names.shape[0]
+experiments_aux_count = np.arange(experiment_amount_single)
+
+experiments_name = all_df.exp_names.unique().tolist()
+all_exp_sorted_with_move = []
+
+#%%
+for exp_name in experiments_name:
+    only_this_experiment_df = sorted_experiments[sorted_experiments['exp_names'] == exp_name].reset_index()
+    exp_df_data = only_this_experiment_df.join(pd.DataFrame(dict(
+        move=np.arange(only_this_experiment_df.shape[0])
+    )))
+    all_exp_sorted_with_move.append(exp_df_data)
+
+all_exp_sorted_with_move = all_exp_sorted_with_move[0].append(all_exp_sorted_with_move[1:])
+chart = sns.lineplot(data=all_exp_sorted_with_move, x='move', y='all_acc', hue='exp_names')
+
+chart.ytitle('Acuracias')
+plt.show()
+
+# %%
+
+font = dict(size=16)
+matplotlib.rc('font', **font)
+sns.set_style('whitegrid')
+fig, axes = plt.subplots(nrows=3, ncols=2, figsize=(21, 11))
+axes_list = list(axes[0]) + list(axes[1]) + list(axes[2])
+for it, exp_name in enumerate(experiments_name):
+    only_this_experiment_df = sorted_experiments[sorted_experiments['exp_names'] == exp_name].reset_index()
+    axes_list[it].set_title(only_this_experiment_df.desc.unique().tolist()[0])
+    sns.histplot(data=only_this_experiment_df, x='all_acc', ax=axes_list[it], kde=False,
+                 stat='probability')
+    axes_list[it].set_xlabel('Accuracy')
+
+fig.tight_layout()
+plt.savefig('experiments.pdf')
+plt.show()
+
+
+# %%
+
+def get_length(input_video):
+    result = subprocess.run(['ffprobe', '-v', 'error', '-show_entries', 'format=duration', '-of', 'default=noprint_wrappers=1:nokey=1', input_video], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    return float(result.stdout)
+
+all_videos = pd.read_csv('all_videos.csv')
+duration = list(map(lambda x: x[1]['end'] - x[1]['beg'], all_videos.iterrows()))
+mean_duration = sum(duration) // len(duration)
+
+db_path = '/mnt/d/gdrive/LibrasCorpus/Santa Catarina/Inventario Libras'
+itens = os.listdir(db_path)
+itens = list(map(lambda x: os.path.join(db_path, x), itens))
+video_durations = []
+for item in itens:
+    videos = list(filter(lambda x: '.mp4' in x, os.listdir(item)))
+    videos = list(map(lambda x: os.path.join(item, x), videos))
+    for v in videos:
+        video_durations.append(get_length(v))
+
+
+# %%

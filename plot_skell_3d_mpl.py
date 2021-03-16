@@ -1,19 +1,29 @@
 from libras_classifiers.librasdb_loaders import DBLoader2NPY
 from pose_extractor.all_parts import BODY_PAIRS
 
+import os
+
 import cv2 as cv
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
-import random
 
-from matplotlib import cm
-from mpl_toolkits.mplot3d.axes3d import Axes3D, get_test_data
-from matplotlib.widgets import Slider, Button, RadioButtons
+import matplotlib.gridspec as gridspec
+
+from mpl_toolkits.mplot3d.axes3d import Axes3D
+from matplotlib.widgets import Slider, Button
+
+db_path = 'D:/gdrive/LibrasCorpus/Santa Catarina/Inventario Libras' \
+          '/ Inventário Nacional de Libras - Grande Florianópolis (Parte II) v1098'
 
 front_data_path = 'v1098_barely_front_view_left_person.csv'
 side_data_path = 'v1098_side_view_left_person.csv'
-#destination_path = f'./{person}_person_3d_{version}.csv'
+
+video_left_data = cv.VideoCapture(os.path.join(db_path, 'FLN_G3_M2_entrevista_CAM3.mp4'))
+video_right_data = cv.VideoCapture(os.path.join(db_path, 'FLN_G3_M2_entrevista_CAM2.mp4'))
+video_front_data = cv.VideoCapture(os.path.join(db_path, 'FLN_G3_M2_entrevista_CAM1.mp4'))
+
+# destination_path = f'./{person}_person_3d_{version}.csv'
 
 left_front_data = pd.read_csv(front_data_path)
 df = pd.DataFrame(left_front_data)
@@ -23,14 +33,13 @@ left_front_data = left_front_data.applymap(DBLoader2NPY.parse_npy_vec_str)
 left_side_data = left_side_data.applymap(DBLoader2NPY.parse_npy_vec_str)
 left_side_data.frame = left_front_data.frame
 
-
 # %%
 all_joints_to_save = ['Nose', 'Neck', 'RShoulder', 'RElbow', 'RWrist',
                       'LShoulder', 'LElbow', 'LWrist', 'RHip', 'RKnee', 'RAnkle', 'LHip',
                       'LKnee', 'LAnkle', 'REye', 'LEye', 'REar', 'LEar'
-                     ]
+                      ]
 
-all_joints_to_use = ['RShoulder', 'RElbow', 'RWrist','LShoulder', 'LElbow', 'LWrist']
+all_joints_to_use = ['RShoulder', 'RElbow', 'RWrist', 'LShoulder', 'LElbow', 'LWrist']
 
 threshold = 0.60
 all_frames = left_front_data.frame.unique().tolist()
@@ -38,7 +47,7 @@ all_frames = left_front_data.frame.unique().tolist()
 
 matches = []
 
-for i in range(0,len(all_frames),10):
+for i in range(0, len(all_frames), 10):
     row_front = left_front_data[left_front_data['frame'] == all_frames[i]]
     row_front = row_front[all_joints_to_use].values[0]
     row_front = [x if x[2] >= threshold else None for x in row_front]
@@ -54,6 +63,7 @@ for i in range(0,len(all_frames),10):
     if len(matches) >= 100:
         break
 
+
 def make_3dpoints(fx, fy, frame=0):
     camera_mat = np.identity(3)
     camera_mat[0][0] = fx
@@ -64,7 +74,7 @@ def make_3dpoints(fx, fy, frame=0):
                                              method=cv.RANSAC, cameraMatrix=camera_mat)
     retval, R, t, mask2 = cv.recoverPose(essential, np.array([x[0] for x in matches]),
                                          np.array([x[1] for x in matches]),
-                                         mask=inliers)#, cameraMatrix=camera_mat)
+                                         mask=inliers)  # , cameraMatrix=camera_mat)
 
     projection1 = np.zeros((3, 4))
     projection1[:3, :3] = camera_mat
@@ -88,7 +98,7 @@ def make_3dpoints(fx, fy, frame=0):
     row_side = row_side.drop(columns=['frame', 'Unnamed: 0'])
     row_side = row_side.applymap(lambda x: np.array([0.0, 0.0, 0.0]) if isinstance(x, float) else x)
     row_side = [(x.values[0] if x.values[0][2] >= threshold else None, key)
-                 for key, x in row_side.iteritems()]
+                for key, x in row_side.iteritems()]
 
     for front, side in zip(row_front, row_side):
         if front[0] is not None and side[0] is not None:
@@ -101,21 +111,30 @@ def make_3dpoints(fx, fy, frame=0):
 
     return pd.DataFrame(dic)
 
-fig = plt.figure(figsize=(21, 9), dpi=720//9)
+
+fig = plt.figure(figsize=(21, 9), dpi=720 // 9)
+gs = gridspec.GridSpec(3, 1)
+
 ax = fig.add_subplot(111, projection='3d')
+ax.set_position(gs[0:2].get_position(fig))
+ax.set_subplotspec(gs[0:2])
 
-x_scale=10
-y_scale=10
-z_scale=10
+ax_frame: plt.Axes = fig.add_subplot(gs[2])
 
-scale=np.diag([x_scale, y_scale, z_scale, 1.0])
-scale=scale*(1.0/scale.max())
-scale[3,3]=1.0
+x_scale = 10
+y_scale = 10
+z_scale = 10
+
+scale = np.diag([x_scale, y_scale, z_scale, 1.0])
+scale = scale * (1.0 / scale.max())
+scale[3, 3] = 1.0
+
 
 def short_proj():
-  return np.dot(Axes3D.get_proj(ax), scale)
+    return np.dot(Axes3D.get_proj(ax), scale)
 
-ax.get_proj=short_proj
+
+ax.get_proj = short_proj
 
 plt.subplots_adjust(left=0.25, bottom=0.25)
 t = np.arange(0.0, 1.0, 0.001)
@@ -129,21 +148,17 @@ df_res = make_3dpoints(1, 1, 0)
 global chart
 global lines
 
-#-------------------------------------------------------------------------
+# -------------------------------------------------------------------------
 chart = []
-colors = ['r','b','g','y','c','m','k','#56004B','#0B2B6B']
-bp = ['Nose', 'Neck', 'RShoulder', 'RElbow', 'RWrist','LShoulder', 'LElbow', '?', '??']
+colors = ['r', 'b', 'g', 'y', 'c', 'm', 'k', '#56004B', '#0B2B6B']
+bp = ['Nose', 'Neck', 'RShoulder', 'RElbow', 'RWrist', 'LShoulder', 'LElbow', '?', '??']
 i = 0
 for key in df_res.keys():
     if df_res[key][0] is not None and df_res[key][0] is not None and df_res[key][0] is not None:
-        chart.append(ax.scatter(df_res[key][0][0],df_res[key][0][1],df_res[key][0][2],color = colors[i], label = bp[i], s = 40))
-        i+=1
-#-------------------------------------------------------------------------
-
-#chart = ax.scatter([df_res[key][0][0] for key in df_res.keys() if df_res[key][0] is not None],
-#                   [df_res[key][0][1] for key in df_res.keys() if df_res[key][0] is not None],
-#                   [df_res[key][0][2] for key in df_res.keys() if df_res[key][0] is not None],
-#                   color = 'k')
+        chart.append(
+            ax.scatter(df_res[key][0][0], df_res[key][0][1], df_res[key][0][2], color=colors[i], label=bp[i], s=40))
+        i += 1
+# -------------------------------------------------------------------------
 
 lines = []
 for pair in BODY_PAIRS:
@@ -152,21 +167,8 @@ for pair in BODY_PAIRS:
             [df_res[pair[0]][0][0], df_res[pair[1]][0][0]],
             [df_res[pair[0]][0][1], df_res[pair[1]][0][1]],
             [df_res[pair[0]][0][2], df_res[pair[1]][0][2]],
-            color = 'k'
+            color='k'
         ))
-
-x_min = min([df_res[key][0][0] for key in df_res.keys() if df_res[key][0] is not None])
-x_max = max([df_res[key][0][0] for key in df_res.keys() if df_res[key][0] is not None])
-
-y_min = min([df_res[key][0][1] for key in df_res.keys() if df_res[key][0] is not None])
-y_max = max([df_res[key][0][1] for key in df_res.keys() if df_res[key][0] is not None])
-
-z_min = min([df_res[key][0][2] for key in df_res.keys() if df_res[key][0] is not None])
-z_max = max([df_res[key][0][2] for key in df_res.keys() if df_res[key][0] is not None])
-
-ax.axes.set_xlim3d(left=x_min, right=x_max)
-ax.axes.set_ylim3d(bottom=y_min, top=y_max)
-ax.axes.set_zlim3d(bottom=z_min, top=z_max)
 
 ax.margins(x=0)
 
@@ -174,13 +176,23 @@ axcolor = 'lightgoldenrodyellow'
 ax_fx = plt.axes([0.25, 0.1, 0.65, 0.03], facecolor=axcolor)
 ax_fy = plt.axes([0.25, 0.15, 0.65, 0.03], facecolor=axcolor)
 frame_num = plt.axes([0.25, 0.20, 0.65, 0.03], facecolor=axcolor)
+slider_scale = plt.axes([0.25, 0.25, 0.65, 0.03], facecolor=axcolor)
 ax_fxy = plt.axes([0.25, 0.05, 0.65, 0.03], facecolor=axcolor)
 
 slider_fx = Slider(ax_fx, 'Foco X (fx)', 1, 1000.0, valinit=f0, valstep=delta_fx)
 slider_fy = Slider(ax_fy, 'Foco Y (fy)', 1, 1000.0, valinit=f0, valstep=delta_fy)
 slider_frame = Slider(frame_num, 'Curr Frame', 0, 1000, valinit=f0, valstep=1.0)
+slider_scale = Slider(slider_scale, 'Escala dos eixos', 0, 1000, valinit=1)
 
 slider_fxy = Slider(ax_fxy, 'Foco X e Y (fx e fy)', 1, 1000.0, valinit=f0, valstep=delta_fy)
+
+video_left_data.set(cv.CAP_PROP_POS_MSEC, 5005 * 30)
+video_front_data.set(cv.CAP_PROP_POS_MSEC, 5005 * 30)
+
+ret, left = video_left_data.read()
+ret, front = video_front_data.read()
+
+ax_frame.imshow(cv.hconcat([left, front])[:, :, ::-1])
 
 
 def update(val):
@@ -195,24 +207,32 @@ def update_fig(fx, fy, frame):
     global lines
     df_res = make_3dpoints(fx, fy, frame)
 
-    #-------------------------------------------------------------------------
+    video_left_data.set(cv.CAP_PROP_POS_MSEC, frame + 5005* 30)
+    video_front_data.set(cv.CAP_PROP_POS_MSEC, frame + 5005 * 30)
+
+    ret, left = video_left_data.read()
+    ret, front = video_front_data.read()
+
+    ax_frame.imshow(cv.hconcat([left, front])[:, :, ::-1])
+
+    # -------------------------------------------------------------------------
     for it in range(len(chart)):
         chart[it].remove()
-        
+
     chart = []
-    colors = ['r','b','g','y','c','m','k','#56004B','#0B2B6B']
-    bp = ['Nose', 'Neck', 'RShoulder', 'RElbow', 'RWrist','LShoulder', 'LElbow', '?', '??']
+    colors = ['r', 'b', 'g', 'y', 'c', 'm', 'k', '#56004B', '#0B2B6B']
+    bp = ['Nose', 'Neck', 'RShoulder', 'RElbow', 'RWrist', 'LShoulder', 'LElbow', '?', '??']
     i = 0
     for key in df_res.keys():
         if df_res[key][0] is not None and df_res[key][0] is not None and df_res[key][0] is not None:
-            chart.append(ax.scatter(df_res[key][0][0],df_res[key][0][1],df_res[key][0][2],color = colors[i], label = bp[i], s = 40))
-            i+=1
-    #-------------------------------------------------------------------------
-    #chart.remove()
-    #chart = ax.scatter([df_res[key][0][0] for key in df_res.keys() if df_res[key][0] is not None],
+            chart.append(ax.scatter(df_res[key][0][0], df_res[key][0][1], df_res[key][0][2], color=colors[i],
+                                    label=bp[i], s=40))
+            i += 1
+    # -------------------------------------------------------------------------
+    # chart.remove()
+    # chart = ax.scatter([df_res[key][0][0] for key in df_res.keys() if df_res[key][0] is not None],
     #                   [df_res[key][0][1] for key in df_res.keys() if df_res[key][0] is not None],
     #                   [df_res[key][0][2] for key in df_res.keys() if df_res[key][0] is not None])
-
 
     for it in range(len(lines)):
         a = lines[it].pop(0)
@@ -225,7 +245,7 @@ def update_fig(fx, fy, frame):
                 [df_res[pair[0]][0][0], df_res[pair[1]][0][0]],
                 [df_res[pair[0]][0][1], df_res[pair[1]][0][1]],
                 [df_res[pair[0]][0][2], df_res[pair[1]][0][2]],
-                color = 'k'
+                color='k'
             ))
 
     x_min = min([df_res[key][0][0] for key in df_res.keys() if df_res[key][0] is not None])
@@ -242,6 +262,7 @@ def update_fig(fx, fy, frame):
     ax.axes.set_zlim3d(bottom=z_min, top=z_max)
     plt.draw()
 
+
 def update_fxy(val):
     fx = slider_fxy.val
     fy = slider_fxy.val
@@ -250,19 +271,29 @@ def update_fxy(val):
     slider_fy.set_val(fy)
     update_fig(fx, fy, frame)
 
+
+def scale_update(val):
+    ax.axes.set_xlim3d(left=-1, right=val)
+    ax.axes.set_ylim3d(bottom=-1, top=val)
+    ax.axes.set_zlim3d(bottom=-1, top=val)
+
+
 slider_fx.on_changed(update)
 slider_fy.on_changed(update)
 slider_frame.on_changed(update)
 slider_fxy.on_changed(update_fxy)
+# slider_scale.on_changed()
 
 resetax = plt.axes([0.8, 0.008, 0.1, 0.04])
 button = Button(resetax, 'Reset', color=axcolor, hovercolor='0.975')
+
 
 def reset(event):
     slider_fx.reset()
     slider_fy.reset()
     slider_frame.reset()
     slider_fxy.reset()
+
 
 button.on_clicked(reset)
 

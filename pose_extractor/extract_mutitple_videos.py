@@ -1,3 +1,7 @@
+import sys
+sys.path.append('.')
+sys.path.append('pose_extractor')
+
 from pose_extractor.df_utils import update_xy_pose_df_single_person
 from pose_extractor.openpose_extractor import OpenposeExtractor, DatumLike
 from pose_extractor.extract_signs_from_video import process_single_sample
@@ -15,8 +19,8 @@ from tqdm import tqdm
 class ExtractMultipleVideos:
 
     def __init__(self, db_path: str, all_videos: pd.DataFrame or str, vid_sync: str or pd.DataFrame,
-                 all_persons_subtitle: str or pd.DataFrame, openpose_path: str, needed_signs_list: list,
-                 path_to_save_dfs: str):
+                 all_persons_subtitle: str or pd.DataFrame, openpose_path: str,
+                 path_to_save_dfs: str, needed_signs_list: list = None):
         """
 
         Parameters
@@ -52,7 +56,7 @@ class ExtractMultipleVideos:
                                                          centroids_df_path='centroids.csv')
 
         self.needed_sings = needed_signs_list if needed_signs_list is not None \
-            else self.all_videos.signs.unique().tolist()
+            else self.all_videos.sign.unique().tolist()
         self.path_to_save_dfs = path_to_save_dfs
 
     def process(self):
@@ -70,14 +74,14 @@ class ExtractMultipleVideos:
                 continue
 
             sings_in_folder = self._process_single_folder(v_part)
-            for sign_df in sings_in_folder:
-                folder_path = os.path.join(self.path_to_save_dfs, sign_df['sign_name'])
-                os.makedirs(folder_path, exist_ok=True)
-                file_name = f'{v_part}---{sign_df["sign_name"]}---{sign_df["beg"]}---{sign_df["end"]}---' \
-                            f'{sign_df["view"]}---{sign_df["talker_id"]}.csv'
-                csv_file_path = os.path.join(folder_path, file_name)
-
-                sign_df['df'].to_csv(csv_file_path)
+            # for sign_df in sings_in_folder:
+            #     folder_path = os.path.join(self.path_to_save_dfs, sign_df['sign_name'])
+            #     os.makedirs(folder_path, exist_ok=True)
+            #     file_name = f'{v_part}---{sign_df["sign_name"]}---{sign_df["beg"]}---{sign_df["end"]}---' \
+            #                 f'{sign_df["view"]}---{sign_df["talker_id"]}.csv'
+            #     csv_file_path = os.path.join(folder_path, file_name)
+            #
+            #     sign_df['df'].to_csv(csv_file_path)
 
     def _process_single_folder(self, v_part: int):
         """
@@ -121,10 +125,18 @@ class ExtractMultipleVideos:
             side_file_name = f'{v_part}---{sign_row.sign}---{sign_row.beg}---{sign_row.end}---' \
                              f'side---{sign_row.talker_id}.csv'
 
+            side_file_name = side_file_name.replace('\\', '')
+            side_file_name = side_file_name.replace('/', '')
+
+            front_file_name = front_file_name.replace('\\', '')
+            front_file_name = front_file_name.replace('/', '')
+
             front_file_path = os.path.join(folder_path, front_file_name)
             side_file_path = os.path.join(folder_path, side_file_name)
             # achar quem sinaliza, se ta no video 1 ou no 2 e extrair.
             is_left = sign_row.talker_id == lf_id_subtitle
+
+            os.makedirs(folder_path, exist_ok=True)
 
             if not os.path.exists(front_file_path):
                 curr_sign_pose_df = self.__extract_sings_from_single_person_video(
@@ -136,8 +148,9 @@ class ExtractMultipleVideos:
                 )
 
                 if curr_sign_pose_df is not None:
-                    all_signs_pose_df.append(dict(df=curr_sign_pose_df, sign_name=sign_row.sign, beg=sign_row.beg,
-                                                  end=sign_row.end, talker_id=sign_row.talker_id, view='side'))
+                    curr_sign_pose_df.to_csv(front_file_path)
+                    # all_signs_pose_df.append(dict(df=curr_sign_pose_df, sign_name=sign_row.sign, beg=sign_row.beg,
+                    #                               end=sign_row.end, talker_id=sign_row.talker_id, view='side'))
             if not os.path.exists(side_file_path):
                 curr_sign_pose_df = self.__extract_sign_from_video_with_2_person(
                     beg_msec=sign_row.beg,
@@ -147,8 +160,9 @@ class ExtractMultipleVideos:
                 )
 
                 if curr_sign_pose_df is not None:
-                    all_signs_pose_df.append(dict(df=curr_sign_pose_df, sign_name=sign_row.sign, beg=sign_row.beg,
-                                                  end=sign_row.end, talker_id=sign_row.talker_id, view='front'))
+                    curr_sign_pose_df.to_csv(side_file_path)
+                    # all_signs_pose_df.append(dict(df=curr_sign_pose_df, sign_name=sign_row.sign, beg=sign_row.beg,
+                    #                               end=sign_row.end, talker_id=sign_row.talker_id, view='front'))
 
         return all_signs_pose_df
 
@@ -181,7 +195,7 @@ class ExtractMultipleVideos:
         vid_path, vid_name = self.__read_vid_path_from_vpart(v_part, 1)
         vid = cv.VideoCapture(vid_path)
         res = process_single_sample(extractor=self.extractor, curr_video=vid, beg=beg_msec, end=end_msec,
-                                    person_needed_id=curr_id_in_subtitle, pbar=tqdm(),
+                                    person_needed_id=curr_id_in_subtitle, # pbar=tqdm(),
                                     pose_tracker=self.pose_centroid_tracker)
         vid.release()
         return res
@@ -498,10 +512,12 @@ if __name__ == '__main__':
                                                   all_videos='all_videos.csv',
                                                   openpose_path='C:/Users/usuario/Documents/Libraries/repos/openpose',
                                                   vid_sync='vid_sync.csv',
-                                                  path_to_save_dfs='../sign_db_front_view',
-                                                  needed_signs_list=new_sign_list,
+                                                  # path_to_save_dfs='../sign_db_front_view',
+                                                  path_to_save_dfs='D:/sign_db_front_view',
+                                                  # needed_signs_list=new_sign_list,
                                                   all_persons_subtitle='all_persons_from_subtitle.csv')
 
-    extractMultipleVideos.unittest_for___extract_sign_from_video_with_2_person()
+    extractMultipleVideos.process()
+    # extractMultipleVideos.unittest_for___extract_sign_from_video_with_2_person()
     # extractMultipleVideos.process()
     # 217 sinais da palavra homem extraidos.

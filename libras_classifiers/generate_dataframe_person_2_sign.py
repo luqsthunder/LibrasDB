@@ -1,4 +1,3 @@
-from libras_classifiers.librasdb_loaders import DBLoader2NPY
 import numpy as np
 import matplotlib.pyplot as plt
 import math
@@ -17,7 +16,7 @@ class DataframePerson2Sign:
         Parameters
         ----------
 
-        db: DBLoader2NPY
+        db: Loader
 
         method: str
 

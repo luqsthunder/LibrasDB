@@ -33,6 +33,7 @@ for x in sorted_signs:
     sorted_sings_count_mode.extend([x['name']] * int(x['count']))
 
 more_than_30_df = pd.DataFrame(data=dict(sign=sorted_sings_count_mode))
+total_signs = sum(map(lambda x: x['count'], sorted_signs))
 
 # %%
 last_count = 0
