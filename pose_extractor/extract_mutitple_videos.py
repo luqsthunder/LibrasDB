@@ -73,7 +73,12 @@ class ExtractMultipleVideos:
             if v_part == -1:
                 continue
 
-            sings_in_folder = self._process_single_folder(v_part)
+            try:
+                sings_in_folder = self._process_single_folder(v_part)
+            except Exception as e:
+                print(e)
+                print(e, file=open('log.txt', mode='a'))
+                continue
             # for sign_df in sings_in_folder:
             #     folder_path = os.path.join(self.path_to_save_dfs, sign_df['sign_name'])
             #     os.makedirs(folder_path, exist_ok=True)
@@ -118,12 +123,12 @@ class ExtractMultipleVideos:
                              position=1):
             sign_row = sign_row[1]
 
-            folder_path = os.path.join(self.path_to_save_dfs, sign_row.sign)
-            front_file_name = f'{v_part}---{sign_row.sign}---{sign_row.beg}---{sign_row.end}---' \
-                              f'front---{sign_row.talker_id}.csv'
+            folder_path = os.path.join(self.path_to_save_dfs, sign_row.sign.replace("?", "").replace(" ", ""))
+            front_file_name = f'{v_part}---{sign_row.sign.replace("?", "").replace(" ", "")}---{sign_row.beg}' \
+                              f'---{sign_row.end}---front---{sign_row.talker_id}.csv'
 
-            side_file_name = f'{v_part}---{sign_row.sign}---{sign_row.beg}---{sign_row.end}---' \
-                             f'side---{sign_row.talker_id}.csv'
+            side_file_name = f'{v_part}---{sign_row.sign.replace("?", "").replace(" ", "")}---{sign_row.beg}' \
+                             f'---{sign_row.end}---side---{sign_row.talker_id}.csv'
 
             side_file_name = side_file_name.replace('\\', '')
             side_file_name = side_file_name.replace('/', '')

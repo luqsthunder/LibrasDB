@@ -116,20 +116,7 @@ class DBLoader2NPY(Sequence):
         return all_sample_separated
 
     @staticmethod
-    def read_all_db_folders(db_path, only_that_classes, angle_or_xy, custom_internal_dir=None):
-        """
-
-        Parameters
-        ----------
-        db_path
-        only_that_classes
-        angle_or_xy
-        custom_internal_dir
-
-        Returns
-        -------
-
-        """
+    def get_classes_dir(db_path, only_that_classes=None, angle_or_xy=None):
         try:
             cls_dirs = [x for x in os.listdir(db_path)]
             if only_that_classes is not None:
@@ -146,6 +133,25 @@ class DBLoader2NPY(Sequence):
                         'using pose as {}'.format(db_path, angle_or_xy)
             print(e, error_msg)
             raise RuntimeError(error_msg)
+
+        return cls_dirs
+
+    @staticmethod
+    def read_all_db_folders(db_path, only_that_classes, angle_or_xy, custom_internal_dir=None):
+        """
+
+        Parameters
+        ----------
+        db_path
+        only_that_classes
+        angle_or_xy
+        custom_internal_dir
+
+        Returns
+        -------
+
+        """
+        cls_dirs = DBLoader2NPY.get_classes_dir(db_path, only_that_classes)
 
         samples_path = []
         for it, class_dir in enumerate(cls_dirs):

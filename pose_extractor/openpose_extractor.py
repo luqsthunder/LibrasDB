@@ -29,8 +29,11 @@ class OpenposeExtractor:
             params = dict()
             model_folder = os.path.join(openpose_path, 'models')
             params["model_folder"] = model_folder
-            params["hand"] = True
+            params["hand"] = 1
             params["hand_detector"] = 0
+            params['face'] = 0
+            params['render_pose'] = 0
+
             # params["body"] = True
             self.op_wrapper = op.WrapperPython()
             self.op_wrapper.configure(params)
