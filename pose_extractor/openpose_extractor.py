@@ -20,11 +20,11 @@ class DatumLike:
 
 
 class OpenposeExtractor:
-    def __init__(self, version='openpose', openpose_path='./'):
+    def __init__(self, version='openpose', openpose_path='./', num_gpu=1):
         self.version = version
         self.op_wrapper = None
         if self.version == 'openpose':
-            openpose_build_path = os.path.join(openpose_path, 'build')
+            openpose_build_path = os.path.join(openpose_path, 'build/')
             self.try_import_openpose(openpose_build_path)
             params = dict()
             model_folder = os.path.join(openpose_path, 'models')
@@ -33,6 +33,9 @@ class OpenposeExtractor:
             params["hand_detector"] = 0
             params['face'] = 0
             params['render_pose'] = 0
+            self.num_gpu = num_gpu
+            if num_gpu > 1:
+                params['num_gpu'] = num_gpu
 
             # params["body"] = True
             self.op_wrapper = op.WrapperPython()
@@ -68,9 +71,9 @@ class OpenposeExtractor:
 
                 # No windows ';' é o separador de itens dentro da variavel do
                 # path.
-                os.environ['PATH'] = os.environ['PATH'] + ';' + \
-                                     os.path.join(openpose_build_path, 'x64/Release') + ';' + \
-                                     os.path.join(openpose_build_path, 'bin') + ';'
+                os.environ['PATH'] = os.environ['PATH'] + ';' \
+                                     + openpose_build_path + 'x64/Release;' \
+                                     + openpose_build_path + 'bin;'
 
                 import pyopenpose as op
             else:
@@ -84,7 +87,7 @@ class OpenposeExtractor:
                 # installation path. Ensure that this is in your python path in
                 # order to use it. sys.path.append('/usr/local/python')
                 from openpose import pyopenpose as op
-        except ImportError as e:
+        except (ImportError, ModuleNotFoundError) as e:
             print('Error: OpenPose library could not be found. Did you enable '
                   '`BUILD_PYTHON` in CMake and have this Python script in the '
                   'right folder?')
@@ -95,3 +98,21 @@ class OpenposeExtractor:
         datum.cvInputData = img
         self.op_wrapper.emplaceAndPop([datum])
         return datum
+
+    def extract_multiple_gpus(self, im_list):
+        # Read and push images into OpenPose wrapper
+        datums = []
+        pose_list = []
+        for im in im_list:
+            datum = op.Datum()
+            datum.cvInputData = im
+            datums.append(datum)
+            self.op_wrapper.waitAndEmplace(datums[-1])
+
+        # Retrieve processed results from OpenPose wrapper
+        for gpu_id in range(0, self.num_gpu):
+            datum = datums[gpu_id]
+            self.op_wrapper.waitAndPop([datum])
+            pose_list.append(datum)
+
+        return pose_list

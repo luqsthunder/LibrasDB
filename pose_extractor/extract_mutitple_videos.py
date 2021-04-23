@@ -19,7 +19,7 @@ from tqdm import tqdm
 class ExtractMultipleVideos:
 
     def __init__(self, db_path: str, all_videos: pd.DataFrame or str, vid_sync: str or pd.DataFrame,
-                 all_persons_subtitle: str or pd.DataFrame, openpose_path: str,
+                 all_persons_subtitle: str or pd.DataFrame, openpose_path: str, gpu_count=1,
                  path_to_save_dfs: str, needed_signs_list: list = None):
         """
 
@@ -39,6 +39,7 @@ class ExtractMultipleVideos:
                 return df.drop(columns=['Unnamed: 0'])
             return df
 
+        self.gpu_count = gpu_count
         self.db_path = db_path
         self.all_videos = all_videos if isinstance(all_videos, pd.DataFrame) else pd.read_csv(all_videos)
         self.all_videos = remove_unnamed_0_col(self.all_videos)
@@ -76,8 +77,9 @@ class ExtractMultipleVideos:
             try:
                 sings_in_folder = self._process_single_folder(v_part)
             except Exception as e:
-                print(e)
-                print(e, file=open('log.txt', mode='a'))
+                err_str = f'{e}'.encode("ascii", errors="ignore").decode()
+                print(err_str)
+                print(err_str, file=open('log.txt', mode='a'))
                 continue
             # for sign_df in sings_in_folder:
             #     folder_path = os.path.join(self.path_to_save_dfs, sign_df['sign_name'])
@@ -118,9 +120,11 @@ class ExtractMultipleVideos:
         # id da pessoa a esquerda na legenda.
         lf_id_subtitle = self.all_persons_subtitle[self.all_persons_subtitle.v_part == v_part].left_person.values[0]
 
+        pbar_single_folder = tqdm(desc='single_folder', total=signs_in_folder.shape[0], position=0, leave=True)
+        pbar_for_video_extraction = tqdm(desc='single_folder', total=signs_in_folder.shape[0], position=1, leave=True)
+
         all_signs_pose_df = []
-        for sign_row in tqdm(signs_in_folder.iterrows(), desc='single_folder', total=signs_in_folder.shape[0],
-                             position=1):
+        for sign_row in signs_in_folder.iterrows():
             sign_row = sign_row[1]
 
             folder_path = os.path.join(self.path_to_save_dfs, sign_row.sign.replace("?", "").replace(" ", ""))
@@ -140,6 +144,8 @@ class ExtractMultipleVideos:
             side_file_path = os.path.join(folder_path, side_file_name)
             # achar quem sinaliza, se ta no video 1 ou no 2 e extrair.
             is_left = sign_row.talker_id == lf_id_subtitle
+
+            pbar_single_folder.update(1)
 
             os.makedirs(folder_path, exist_ok=True)
 
@@ -513,9 +519,9 @@ if __name__ == '__main__':
         # 'OUVIR',
         # 'MÃE',
     ]
-    extractMultipleVideos = ExtractMultipleVideos(db_path='D:/gdrive',
+    extractMultipleVideos = ExtractMultipleVideos(db_path='D:/libras corpus',
                                                   all_videos='all_videos.csv',
-                                                  openpose_path='C:/Users/usuario/Documents/Libraries/repos/openpose',
+                                                  openpose_path='C:/Users/lucas/Documents/Projects/Libras/PoseExtractors/openpose',
                                                   vid_sync='vid_sync.csv',
                                                   # path_to_save_dfs='../sign_db_front_view',
                                                   path_to_save_dfs='D:/sign_db_front_view',

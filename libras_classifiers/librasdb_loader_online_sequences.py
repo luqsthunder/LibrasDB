@@ -106,8 +106,56 @@ class DBLoaderOnlineSequences:
                         for f in joints_name
                     })
                     samples_loaded[s_idx]['signs'][s] = empty_df.append(samples_loaded[s_idx]['signs'][s])
+
+                    if clean_nan:
+                        sample = self.__clean_sample(sample)
+
+                    if not self.angle_pose:
+                        sample = sample.applymap(DBLoader2NPY.parse_npy_vec_str)
+
+                    if self.scaler_cls is not None and not self.angle_pose:
+                        sample = DBLoader2NPY.scale_single_sample(sample, self.scaler_cls)
+
+                    if self.add_derivatives and self.angle_pose:
+                        sample = self.make_angle_derivative_sample(sample)
+
+                    if self.add_derivatives and not self.angle_pose:
+                        sample = self.make_xy_derivative_sample(sample)
+
         # e ajustar os Y para frame
         return samples_loaded, cls_dirs
+
+    def __clean_sample(self, sample):
+        """
+        Remove da amostra atual
+
+        Parameters
+        ----------
+        sample : Pandas Dataframe
+            Dataframe que deve conter uma amostra de um video ja previamente
+            extraido ou convertido para angulos.
+
+        Returns
+        -------
+
+        Pandas Dataframe
+            dataframe com nan preenchidos pelo valor padrão definido no
+            construtor.
+        """
+
+        # No formato XY cada junta da pose é uma str de um np.array.
+        # Como vai ser convertido de str para vetor apos ser carregado, isso
+        # evita o erro do pandas não aceitar preencher nulos com um np.array.
+        xy_str_rep = str(self.const_none_xy_rep)
+        m_sample = sample.copy()
+
+        if not self.angle_pose:
+            zero_rep = str(np.array([0., 0., 0.]))
+            m_sample = m_sample.replace(zero_rep, np.nan)
+
+
+        return m_sample.fillna(self.const_none_angle_rep
+                               if self.angle_pose else xy_str_rep)
 
     def joints_used(self):
         """
@@ -120,6 +168,67 @@ class DBLoaderOnlineSequences:
         """
         joint_names = self.samples[0][0].keys() if self.joints_2_use is None else self.joints_2_use
         return joint_names
+
+    def batch_load_samples(self, samples_idxs, as_npy=True, clean_nan=True):
+        """
+        Parameters
+        ----------
+        samples_idxs : list
+            Lista dos ids a serem retornados.
+
+        as_npy: bool
+            Boleano que indica se deve retornar um dataframe ou uma array de
+            numpy arrays.
+
+        clean_nan : bool
+            Boleano indicando se deve ser limpo as amostras com nulos.
+
+        pbar: tqdm
+            Progress bar to use while loading samples
+
+        Returns
+        -------
+
+        """
+
+        if pbar is not None:
+            pbar.reset(total=len(samples_idxs))
+            pbar.set_description('loading samples')
+        X = []
+        Y = []
+        for idx in samples_idxs:
+            x, y = self.__load_sample_by_pos(idx, clean_nan=clean_nan)
+            if self.joints_2_use is not None:
+                x = x[self.joints_2_use]
+            if not self.angle_pose:
+                x = x.applymap(lambda c: c[:2] if type(c) is np.ndarray else c)
+
+                if self.samples_memory_xy_npy[idx] is None and as_npy:
+                    x = self.__stack_xy_pose_2_npy(x)
+                    self.samples_memory_xy_npy[idx] = x
+                elif self.samples_memory_xy_npy[idx] is not None and as_npy:
+                    x = self.samples_memory_xy_npy[idx]
+
+                X.append(x)
+            else:
+                X.append(x.drop(columns=['frame']).values if as_npy else x)
+            Y.append(y)
+
+        if as_npy:
+            shape_before = Y[0].shape
+            Y = np.concatenate(Y).reshape(len(samples_idxs), shape_before[0], shape_before[1])
+
+        if as_npy and self.angle_pose:
+            shape_before = X[0].shape
+            new_shape = [len(samples_idxs)]
+            new_shape.extend(list(shape_before))
+            new_shape = tuple(new_shape)
+            X = np.concatenate(X).reshape(new_shape)
+
+        if as_npy and not self.angle_pose:
+            X = np.stack(X, axis=0)
+
+        return X, Y
 
     def __getitem__(self, item):
         pass
