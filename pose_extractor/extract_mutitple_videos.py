@@ -19,8 +19,8 @@ from tqdm import tqdm
 class ExtractMultipleVideos:
 
     def __init__(self, db_path: str, all_videos: pd.DataFrame or str, vid_sync: str or pd.DataFrame,
-                 all_persons_subtitle: str or pd.DataFrame, openpose_path: str, gpu_count=1,
-                 path_to_save_dfs: str, needed_signs_list: list = None):
+                 all_persons_subtitle: str or pd.DataFrame, openpose_path: str,
+                 path_to_save_dfs: str, needed_signs_list: list = None, gpu_count: int = 1):
         """
 
         Parameters
@@ -70,12 +70,19 @@ class ExtractMultipleVideos:
         """
 
         all_v_parts = self.vid_sync.v_part.unique().tolist()
-        for v_part in tqdm(all_v_parts, position=3, desc="all folders"):
+
+        pbar_single_folder = tqdm(desc='single_folder', position=1, leave=True)
+        pbar_for_video_extraction = tqdm(desc='all_folders', total=len(all_v_parts), position=0, leave=True)
+
+        for v_part in all_v_parts:
+
+            pbar_for_video_extraction.update(1)
+
             if v_part == -1:
                 continue
 
             try:
-                sings_in_folder = self._process_single_folder(v_part)
+                sings_in_folder = self._process_single_folder(v_part, pbar=pbar_single_folder)
             except Exception as e:
                 err_str = f'{e}'.encode("ascii", errors="ignore").decode()
                 print(err_str)
@@ -90,7 +97,7 @@ class ExtractMultipleVideos:
             #
             #     sign_df['df'].to_csv(csv_file_path)
 
-    def _process_single_folder(self, v_part: int):
+    def _process_single_folder(self, v_part: int, pbar: tqdm = None):
         """
 
         É iterado sobre a pasta extraindo todos os sinais e retorna uma lista com os CSVs de cada sinal extraido.
@@ -120,8 +127,9 @@ class ExtractMultipleVideos:
         # id da pessoa a esquerda na legenda.
         lf_id_subtitle = self.all_persons_subtitle[self.all_persons_subtitle.v_part == v_part].left_person.values[0]
 
-        pbar_single_folder = tqdm(desc='single_folder', total=signs_in_folder.shape[0], position=0, leave=True)
-        pbar_for_video_extraction = tqdm(desc='single_folder', total=signs_in_folder.shape[0], position=1, leave=True)
+        if pbar is not None:
+            pbar.reset(total=signs_in_folder.shape[0])
+            pbar.set_description(f'single folder {v_part}')
 
         all_signs_pose_df = []
         for sign_row in signs_in_folder.iterrows():
@@ -145,7 +153,8 @@ class ExtractMultipleVideos:
             # achar quem sinaliza, se ta no video 1 ou no 2 e extrair.
             is_left = sign_row.talker_id == lf_id_subtitle
 
-            pbar_single_folder.update(1)
+            if pbar is not None:
+                pbar.update(1)
 
             os.makedirs(folder_path, exist_ok=True)
 
@@ -229,6 +238,35 @@ class ExtractMultipleVideos:
 
         """
 
+        def update_df_with_single_pose(dt_, curr_df, curr_person_, curr_msec):
+            if enable_debug:
+                if curr_person_ is not None:
+                    cv.circle(dt.cvOutputData, center=tuple(map(int, curr_person_[1][:2])), radius=5, thickness=-1,
+                              color=(255, 128, 0))
+
+                if cv_debug:
+                    cv.imshow('debug', dt.cvOutputData)
+                    cv.waitKey(1)
+                else:
+                    plt.imshow(dt.cvOutputData[:, :, :: -1])
+                    plt.show()
+
+            curr_person_, person_id_ = ExtractMultipleVideos.get_person_sorted_left_2_right(dt_, is_left, is_body=True)
+            curr_person_hand_, person_id_hand_ = ExtractMultipleVideos.get_person_sorted_left_2_right(dt_, is_left,
+                                                                                                      is_body=False)
+
+            v_df = update_xy_pose_df_single_person(dt_, curr_df,
+                                                   int(curr_msec),
+                                                   person_id_,
+                                                   person_id_hand_,
+                                                   all_parts.BODY_PARTS_NAMES,
+                                                   all_parts.HAND_PARTS_NAMES)
+
+            if enable_debug and cv_debug:
+                cv.destroyAllWindows()
+
+            return v_df
+
         # Encontrando qual é a pasta/projeto/item que deve ser lido.
         row_vid_sync = self.vid_sync[self.vid_sync.v_part == v_part]
         if row_vid_sync.left_id.values[0] == -1 or row_vid_sync.right_id.values[0] == -1:
@@ -263,13 +301,13 @@ class ExtractMultipleVideos:
 
         video_df = pd.DataFrame(columns=df_cols)
 
-        curr_frame_pos = vid.get(cv.CAP_PROP_POS_MSEC)
+        curr_msec_pos = vid.get(cv.CAP_PROP_POS_MSEC)
         curr_person, person_id = ExtractMultipleVideos.get_person_sorted_left_2_right(dt, is_left, is_body=True)
         curr_person_hand, person_id_hand = ExtractMultipleVideos.get_person_sorted_left_2_right(dt, is_left,
                                                                                                 is_body=False)
 
         video_df = update_xy_pose_df_single_person(dt, video_df,
-                                                   int(curr_frame_pos),
+                                                   int(curr_msec_pos),
                                                    person_id,
                                                    person_id_hand,
                                                    all_parts.BODY_PARTS_NAMES,
@@ -277,47 +315,44 @@ class ExtractMultipleVideos:
 
         if pbar is not None:
             pbar.reset(total=end_msec - beg_msec)
-            pbar.update(beg_msec - curr_frame_pos)
+            pbar.update(beg_msec - curr_msec_pos)
 
-        last_frame_pos = curr_frame_pos
-        while curr_frame_pos <= end_msec:
-            ret, frame = vid.read()
-            if not ret:
-                return None
+        last_msec_pos = curr_msec_pos
+        while curr_msec_pos <= end_msec:
 
-            dt: DatumLike = self.extractor.extract_poses(frame)
+            if self.gpu_count > 1:
+                frames = []
+                msecs = []
+                for _ in range(self.gpu_count):
+                    ret, frame = vid.read()
+                    curr_msec_pos = vid.get(cv.CAP_PROP_POS_MSEC)
 
-            if enable_debug:
-                if curr_person is not None:
-                    cv.circle(dt.cvOutputData, center=tuple(map(int, curr_person[1][:2])), radius=5, thickness=-1,
-                              color=(255, 128, 0))
+                    if curr_msec_pos >= end_msec:
+                        break
 
-                if cv_debug:
-                    cv.imshow('debug', dt.cvOutputData)
-                    cv.waitKey(1)
-                else:
-                    plt.imshow(dt.cvOutputData[:, :, :: -1])
-                    plt.show()
+                    if not ret and len(frames) == 0:
+                        return None
 
-            curr_person, person_id = ExtractMultipleVideos.get_person_sorted_left_2_right(dt, is_left, is_body=True)
-            curr_person_hand, person_id_hand = ExtractMultipleVideos.get_person_sorted_left_2_right(dt, is_left,
-                                                                                                    is_body=False)
+                    msecs.append(curr_msec_pos)
+                    frames.append(frame)
+                poses = self.extractor.extract_multiple_gpus(frames)
+                for p, msec in zip(poses, msecs):
+                    video_df = update_df_with_single_pose(p, video_df, curr_person, msec)
 
-            curr_frame_pos = vid.get(cv.CAP_PROP_POS_MSEC)
-            video_df = update_xy_pose_df_single_person(dt, video_df,
-                                                       int(curr_frame_pos),
-                                                       person_id,
-                                                       person_id_hand,
-                                                       all_parts.BODY_PARTS_NAMES,
-                                                       all_parts.HAND_PARTS_NAMES)
+            else:
+                ret, frame = vid.read()
+                curr_msec_pos = vid.get(cv.CAP_PROP_POS_MSEC)
+                if not ret:
+                    return None
+                dt: DatumLike = self.extractor.extract_poses(frame)
+                video_df = update_df_with_single_pose(dt, video_df, curr_person, curr_msec_pos)
+
+            curr_msec_pos = vid.get(cv.CAP_PROP_POS_MSEC)
 
             if pbar is not None:
-                pbar.update(curr_frame_pos - last_frame_pos)
+                pbar.update(int(curr_msec_pos - last_msec_pos))
 
-            last_frame_pos = curr_frame_pos
-
-        if enable_debug and cv_debug:
-            cv.destroyAllWindows()
+            last_msec_pos = curr_msec_pos
 
         vid.release()
         return video_df
@@ -349,6 +384,9 @@ class ExtractMultipleVideos:
         vid_path, vid1_name = ExtractMultipleVideos.read_vid_path_from_vpart(folder_complete_path, vid_number)
 
         return vid_path, vid1_name
+
+    def __submit_work_to_multi_gpu(self):
+        pass
 
     @staticmethod
     def read_vid_path_from_vpart(folder_complete_path, vid_number):

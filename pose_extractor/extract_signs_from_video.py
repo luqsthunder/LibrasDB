@@ -20,7 +20,7 @@ class ExtractSignsFromVideo:
         pass
 
 
-def process_single_sample(extractor, curr_video, beg, end, person_needed_id, pose_tracker, pbar=None):
+def process_single_sample(extractor, curr_video, beg, end, person_needed_id, pose_tracker, pbar=None, num_gpus=1):
 
     frame_time = 1000 / curr_video.get(cv.CAP_PROP_FPS)
     frame_end_pos = end / frame_time
@@ -43,37 +43,59 @@ def process_single_sample(extractor, curr_video, beg, end, person_needed_id, pos
         pbar.reset(total=int(frame_end_pos - beg_frame_pos) + 1)
 
     first_x_mid = None
-    while curr_video.get(cv.CAP_PROP_POS_FRAMES) <= frame_end_pos:
-        ret, frame = curr_video.read()
-        if not ret:
-            return None
-        dt = extractor.extract_poses(frame)
-        if first_x_mid is None:
+
+    def update_single_pose_in_df(dt_, curr_df, first_x_mid_, curr_msec):
+        if first_x_mid_ is None:
             curr_centroids = list(map(pose_tracker.make_xy_centroid, dt.poseKeypoints))
             if len(curr_centroids) < 2:
                 return None
 
             x_mid_point = sum(map(lambda x: x[0], curr_centroids))
-            first_x_mid = x_mid_point / len(curr_centroids)
+            first_x_mid_ = x_mid_point / len(curr_centroids)
 
-        curr_frame_pos = int(curr_video.get(cv.CAP_PROP_POS_FRAMES))
-        curr_msec_pos = int(curr_video.get(cv.CAP_PROP_POS_MSEC))
-        left_sorted_persons = pose_tracker.filter_persons_by_x_mid(dt, first_x_mid)
-        video_df = update_xy_pose_df_single_person(dt, video_df,
-                                                   curr_msec_pos,
-                                                   left_sorted_persons[real_id_if_sorted][0],
-                                                   left_sorted_persons[real_id_if_sorted][1],
-                                                   pose_tracker.body_parts,
-                                                   pose_tracker.hands_parts)
+        left_sorted_persons = pose_tracker.filter_persons_by_x_mid(dt_, first_x_mid_)
+        new_df = update_xy_pose_df_single_person(dt, curr_df,
+                                                 curr_msec,
+                                                 left_sorted_persons[real_id_if_sorted][0],
+                                                 left_sorted_persons[real_id_if_sorted][1],
+                                                 pose_tracker.body_parts,
+                                                 pose_tracker.hands_parts)
+        return new_df, first_x_mid_
+
+    while curr_video.get(cv.CAP_PROP_POS_FRAMES) <= frame_end_pos:
+        curr_update_amount = num_gpus
+        if num_gpus > 1:
+            frames = []
+            msecs = []
+            for _ in range(num_gpus):
+                ret, frame = curr_video.read()
+                curr_msec_pos = curr_video.get(cv.CAP_PROP_POS_MSEC)
+
+                if curr_msec_pos >= end:
+                    break
+
+                if not ret and len(frames) == 0:
+                    return None
+
+                msecs.append(curr_msec_pos)
+                frames.append(frame)
+            poses = extractor.extract_multiple_gpus(frames)
+            for p, msec in zip(poses, msecs):
+                video_df, first_x_mid = update_single_pose_in_df(p, video_df, first_x_mid, msec)
+
+            curr_update_amount = len(frames)
+
+        else:
+            ret, frame = curr_video.read()
+            curr_msec_pos = curr_video.get(cv.CAP_PROP_POS_MSEC)
+            if not ret:
+                return None
+            dt = extractor.extract_poses(frame)
+            video_df, first_x_mid = update_single_pose_in_df(dt, video_df, first_x_mid, curr_msec_pos)
+
         if pbar is not None:
-            pbar.update(1)
-            #pbar.refresh()
+            pbar.update(curr_update_amount)
 
-    # mean_x_cent = 0
-    # for x in debug_centroids:
-    #     mean_x_cent += x[0] if x is not None else 0
-    # mean_x_cent = mean_x_cent / len(debug_centroids)
-    # print(mean_x_cent)
     return video_df
 
 
