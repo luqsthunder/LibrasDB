@@ -8,6 +8,7 @@ import cv2 as cv
 from concurrent.futures import ThreadPoolExecutor
 import multiprocessing
 from copy import deepcopy
+from colorama import init
 
 
 class AllEAFParser2CSV:
@@ -169,7 +170,7 @@ class AllEAFParser2CSV:
 
         if check_n_remove_dups:
             path_2_dup_all_videos = os.path.join(path_to_save_sign_df,
-                                                 '../dupl-all_videos.csv')
+                                                 '../dupl-all_videos2.csv')
             libras_df.to_csv(path_2_dup_all_videos, index=False)
 
             if pbar_dup is not None:
@@ -195,7 +196,7 @@ class AllEAFParser2CSV:
             single_list_drop = list(set(single_list_drop))
             libras_df = libras_df.drop(single_list_drop)
 
-        path_2_all_videos = os.path.join(path_to_save_sign_df, '../all_videos.csv')
+        path_2_all_videos = os.path.join(path_to_save_sign_df, '../all_videos2.csv')
         libras_df.to_csv(path_2_all_videos, index=False)
 
     def remove_db_df_path_specific(self, df):
@@ -442,7 +443,9 @@ class AllEAFParser2CSV:
 
 
 if __name__ == '__main__':
-    db_cut_videos = AllEAFParser2CSV('/media/usuario/Others/gdrive/LibrasCorpus')
+    init()
+
+    db_cut_videos = AllEAFParser2CSV('D:/libras corpus/LibrasCorpus')
     db_cut_videos.process(path_to_save_sign_df='./', check_n_remove_dups=False)
     print(db_cut_videos.bad_subs, file=open('bad_subs.txt', mode='w'))
     print(db_cut_videos.bad_videos, file=open('bad_videos.txt', mode='w'))

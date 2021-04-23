@@ -14,6 +14,7 @@ import pandas as pd
 import cv2 as cv
 import matplotlib.pyplot as plt
 from tqdm import tqdm
+from colorama import init
 
 
 class ExtractMultipleVideos:
@@ -56,8 +57,7 @@ class ExtractMultipleVideos:
         self.pose_centroid_tracker = PoseCentroidTracker(all_videos, all_videos, openpose_path=self.extractor,
                                                          centroids_df_path='centroids.csv')
 
-        self.needed_sings = needed_signs_list if needed_signs_list is not None \
-            else self.all_videos.sign.unique().tolist()
+        self.needed_sings = needed_signs_list
         self.path_to_save_dfs = path_to_save_dfs
 
     def process(self):
@@ -71,8 +71,8 @@ class ExtractMultipleVideos:
 
         all_v_parts = self.vid_sync.v_part.unique().tolist()
 
-        pbar_single_folder = tqdm(desc='single_folder', position=1, leave=True)
-        pbar_for_video_extraction = tqdm(desc='all_folders', total=len(all_v_parts), position=0, leave=True)
+        pbar_single_folder = tqdm(desc='single_folder', position=1, leave=False)
+        pbar_for_video_extraction = tqdm(desc='all_folders', total=len(all_v_parts), position=0)
 
         for v_part in all_v_parts:
 
@@ -122,18 +122,26 @@ class ExtractMultipleVideos:
         signs_in_folder = self.all_videos[self.all_videos.folder == curr_folder]
 
         # encontrado os sinais que possuem dentro desse folder.
-        signs_in_folder = signs_in_folder[signs_in_folder.sign.isin(self.needed_sings)]
+
+        if self.needed_sings is not None:
+            signs_in_folder = signs_in_folder[signs_in_folder.sign.isin(self.needed_sings)]
 
         # id da pessoa a esquerda na legenda.
         lf_id_subtitle = self.all_persons_subtitle[self.all_persons_subtitle.v_part == v_part].left_person.values[0]
+
+        if signs_in_folder.shape[0] == 0:
+            return []
 
         if pbar is not None:
             pbar.reset(total=signs_in_folder.shape[0])
             pbar.set_description(f'single folder {v_part}')
 
         all_signs_pose_df = []
+        count = 0
         for sign_row in signs_in_folder.iterrows():
             sign_row = sign_row[1]
+
+            count += 1
 
             folder_path = os.path.join(self.path_to_save_dfs, sign_row.sign.replace("?", "").replace(" ", ""))
             front_file_name = f'{v_part}---{sign_row.sign.replace("?", "").replace(" ", "")}---{sign_row.beg}' \
@@ -164,7 +172,7 @@ class ExtractMultipleVideos:
                     end_msec=sign_row.end,
                     v_part=v_part,
                     is_left=is_left,
-                    enable_debug=False
+                    enable_debug=False,
                 )
 
                 if curr_sign_pose_df is not None:
@@ -215,7 +223,9 @@ class ExtractMultipleVideos:
         vid_path, vid_name = self.__read_vid_path_from_vpart(v_part, 1)
         vid = cv.VideoCapture(vid_path)
         res = process_single_sample(extractor=self.extractor, curr_video=vid, beg=beg_msec, end=end_msec,
-                                    person_needed_id=curr_id_in_subtitle, # pbar=tqdm(),
+                                    person_needed_id=curr_id_in_subtitle,
+                                    # pbar=tqdm(position=2),
+                                    num_gpus=self.gpu_count,
                                     pose_tracker=self.pose_centroid_tracker)
         vid.release()
         return res
@@ -320,7 +330,7 @@ class ExtractMultipleVideos:
         last_msec_pos = curr_msec_pos
         while curr_msec_pos <= end_msec:
 
-            if self.gpu_count > 1:
+            if self.gpu_count > 0:
                 frames = []
                 msecs = []
                 for _ in range(self.gpu_count):
@@ -544,6 +554,7 @@ class ExtractMultipleVideos:
 
 
 if __name__ == '__main__':
+    #init()
     sign_list = [
         # 'NÃO', 'TER', 'BOM', 'E(esperar)','COMO', 'E(acabar)', 'VER', 'HOMEM', 'PORQUE', 'ESTUDAR'
         'VER'
@@ -558,7 +569,7 @@ if __name__ == '__main__':
         # 'MÃE',
     ]
     extractMultipleVideos = ExtractMultipleVideos(db_path='D:/libras corpus',
-                                                  all_videos='all_videos.csv',
+                                                  all_videos='all_videos3.csv',
                                                   openpose_path='C:/Users/lucas/Documents/Projects/Libras/PoseExtractors/openpose',
                                                   vid_sync='vid_sync.csv',
                                                   # path_to_save_dfs='../sign_db_front_view',
@@ -566,7 +577,10 @@ if __name__ == '__main__':
                                                   # needed_signs_list=new_sign_list,
                                                   all_persons_subtitle='all_persons_from_subtitle.csv')
 
-    extractMultipleVideos.process()
+    try:
+        extractMultipleVideos.process()
+    except:
+        print('LOOOL')
     # extractMultipleVideos.unittest_for___extract_sign_from_video_with_2_person()
     # extractMultipleVideos.process()
     # 217 sinais da palavra homem extraidos.

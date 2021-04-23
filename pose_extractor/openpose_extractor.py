@@ -101,18 +101,21 @@ class OpenposeExtractor:
 
     def extract_multiple_gpus(self, im_list):
         # Read and push images into OpenPose wrapper
-        datums = []
         pose_list = []
-        for im in im_list:
-            datum = op.Datum()
-            datum.cvInputData = im
-            datums.append(datum)
-            self.op_wrapper.waitAndEmplace([datum])
+        try:
+            datums = []
+            for im in im_list:
+                datum = op.Datum()
+                datum.cvInputData = im
+                datums.append(datum)
+                self.op_wrapper.waitAndEmplace([datum])
 
-        # Retrieve processed results from OpenPose wrapper
-        for d_id in range(0, len(datums)):
-            datum = datums[d_id]
-            self.op_wrapper.waitAndPop([datum])
-            pose_list.append(datum)
+            # Retrieve processed results from OpenPose wrapper
+            for d_id in range(0, len(datums)):
+                datum = datums[d_id]
+                self.op_wrapper.waitAndPop([datum])
+                pose_list.append(datum)
+        except BaseException as e:
+            print(f' AT OP EXTRACTOR {e}')
 
         return pose_list

@@ -44,17 +44,17 @@ def process_single_sample(extractor, curr_video, beg, end, person_needed_id, pos
 
     first_x_mid = None
 
-    def update_single_pose_in_df(dt_, curr_df, first_x_mid_, curr_msec):
+    def update_single_pose_in_df(pose_dt, curr_df, first_x_mid_, curr_msec):
         if first_x_mid_ is None:
-            curr_centroids = list(map(pose_tracker.make_xy_centroid, dt.poseKeypoints))
+            curr_centroids = list(map(pose_tracker.make_xy_centroid, pose_dt.poseKeypoints))
             if len(curr_centroids) < 2:
                 return None
 
             x_mid_point = sum(map(lambda x: x[0], curr_centroids))
             first_x_mid_ = x_mid_point / len(curr_centroids)
 
-        left_sorted_persons = pose_tracker.filter_persons_by_x_mid(dt_, first_x_mid_)
-        new_df = update_xy_pose_df_single_person(dt, curr_df,
+        left_sorted_persons = pose_tracker.filter_persons_by_x_mid(pose_dt, first_x_mid_)
+        new_df = update_xy_pose_df_single_person(pose_dt, curr_df,
                                                  curr_msec,
                                                  left_sorted_persons[real_id_if_sorted][0],
                                                  left_sorted_persons[real_id_if_sorted][1],
@@ -64,7 +64,7 @@ def process_single_sample(extractor, curr_video, beg, end, person_needed_id, pos
 
     while curr_video.get(cv.CAP_PROP_POS_FRAMES) <= frame_end_pos:
         curr_update_amount = num_gpus
-        if num_gpus > 1:
+        if num_gpus > 0:
             frames = []
             msecs = []
             for _ in range(num_gpus):
