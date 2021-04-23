@@ -107,11 +107,11 @@ class OpenposeExtractor:
             datum = op.Datum()
             datum.cvInputData = im
             datums.append(datum)
-            self.op_wrapper.waitAndEmplace(datums[-1])
+            self.op_wrapper.waitAndEmplace([datum])
 
         # Retrieve processed results from OpenPose wrapper
-        for gpu_id in range(0, self.num_gpu):
-            datum = datums[gpu_id]
+        for d_id in range(0, len(datums)):
+            datum = datums[d_id]
             self.op_wrapper.waitAndPop([datum])
             pose_list.append(datum)
 
