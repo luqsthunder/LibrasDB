@@ -19,8 +19,6 @@ try:
 
         if len(more_folders) > 0:
             csvs_in_more = []
-            more_folders = list(map(lambda x: os.path.join(db_folder, x),
-                                    more_folders))
             for folder_in_more in more_folders:
                 files_in_more = list(map(
                     lambda x: os.path.join(x, folder_in_more),
