@@ -4,6 +4,7 @@ import pandas as pd
 db_path = '../sign_db_front_view/sign_db_rig/'
 
 all_db_folders = os.listdir(db_path)
+all_db_folders = list(map(lambda x: os.path.join(db_path, x), all_db_folders))
 
 csvs_with_zeros = []
 
