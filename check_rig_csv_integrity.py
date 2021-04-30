@@ -27,7 +27,6 @@ for db_folder in tqdm(all_db_folders):
         files_csv.extend(csvs_in_more)
 
     for db_folder_csv in files_csv:
-        db_folder_csv = os.path.join(db_folder, db_folder_csv)
         sign_df = pd.read_csv(db_folder_csv)
         if sign_df.shape[0] == 0:
             print(db_folder_csv)
