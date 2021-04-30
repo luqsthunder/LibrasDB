@@ -13,7 +13,7 @@ csvs_with_zeros = []
 try:
     for db_folder in tqdm(all_db_folders):
         folder_content = os.listdir(db_folder)
-        files_csv = list(filter(os.path.isfile, files_csv))
+        files_csv = list(filter(os.path.isfile, folder_content))
         more_folders = list(filter(os.path.isdir, files_csv))
 
         if len(more_folders) > 0:
