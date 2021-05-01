@@ -1,11 +1,20 @@
-import unittest
-
 from libras_classifiers.librasdb_loader_online_sequences import DBLoaderOnlineSequences
 
-class MyTestCase(unittest.TestCase):
+
+class TestDBLoaderOnlineSequences:
+    db = None
+
+    def setup(self):
+        self.db = DBLoaderOnlineSequences(db_path='../libras-db-folders-online-debug', batch_size=1)
+
     def test_constructor(self):
-        DBLoaderOnlineSequences(db_path='../libras-db-folders-online-debug', batch_size=1)
+        try:
+            db = DBLoaderOnlineSequences(db_path='../libras-db-folders-online-debug', batch_size=1)
+            if self.db is None:
+                self.db = db
+            assert True
+        except BaseException:
+            assert False
 
-
-if __name__ == '__main__':
-    unittest.main()
+    def test_batch_load_samples(self):
+        self.db.batch_load_samples([0])

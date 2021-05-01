@@ -330,7 +330,7 @@ class ExtractMultipleVideos:
         last_msec_pos = curr_msec_pos
         while curr_msec_pos <= end_msec:
 
-            if self.gpu_count > 0:
+            if self.gpu_count > 1:
                 frames = []
                 msecs = []
                 for _ in range(self.gpu_count):
@@ -554,7 +554,7 @@ class ExtractMultipleVideos:
 
 
 if __name__ == '__main__':
-    #init()
+    init()
     sign_list = [
         # 'NÃO', 'TER', 'BOM', 'E(esperar)','COMO', 'E(acabar)', 'VER', 'HOMEM', 'PORQUE', 'ESTUDAR'
         'VER'

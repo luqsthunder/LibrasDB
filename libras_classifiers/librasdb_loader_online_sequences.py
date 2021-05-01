@@ -13,7 +13,7 @@ from tensorflow.keras.utils import Sequence
 
 class DBLoaderOnlineSequences:
 
-    def __init__(self, db_path, batch_size, joints_2_use=None, angle_pose=False, shuffle=False, add_derivatives=False,
+    def __init__(self, db_path, batch_size, amount_frames_per_sequence=None, joints_2_use=None, angle_pose=False, shuffle=False, add_derivatives=False,
                  make_k_fold=False, k_fold_amount=None, only_that_classes=None, scaler_cls=None, const_none_angle_rep=0,
                  const_none_xy_rep=np.array([0, 0, 0])):
         """
@@ -46,12 +46,14 @@ class DBLoaderOnlineSequences:
         self.only_that_classes = only_that_classes
         self.shuffle = shuffle
 
+        self.pad_class = 0
+
         self.max_sample_length = None
-        self.samples, self.cls_dirs = self.read_all_db_folders(db_path, only_that_classes)
+        self.angle_pose = angle_pose
+        self.amount_frames_per_sequence = amount_frames_per_sequence
+        self.samples, self.classes = self._read_all_db_folders_internal(self.db_path, self.only_that_classes)
 
-        print(self.samples)
-
-    def read_all_db_folders(self, db_path, only_that_classes):
+    def _read_all_db_folders_internal(self, db_path, only_that_classes, clean_nan=True):
         """
 
         Parameters
@@ -66,7 +68,7 @@ class DBLoaderOnlineSequences:
 
         """
 
-        class_dict = {}
+        class_dict = {'---PADDING---': 0}
         cls_dirs = DBLoader2NPY.get_classes_dir(db_path, only_that_classes)
         samples_loaded = []
         class_names_in_pairs = []
@@ -82,6 +84,7 @@ class DBLoaderOnlineSequences:
             for folder_sample in all_samples_in_class:
                 sings_at_folder_sample = [os.path.join(folder_sample, x)
                                           for x in os.listdir(folder_sample) if '.csv' in x]
+                # os sinais precisam ser ordenados pelo atributo begin ou informação de begin no seu arquivo.
                 sings_at_folder_sample = sorted(sings_at_folder_sample, key=lambda x: x.split('---')[2])
                 classes = [class_dict[x.replace('\\', '/').split('/')[-1].split('---')[1]]
                            for x in sings_at_folder_sample]
@@ -90,40 +93,51 @@ class DBLoaderOnlineSequences:
                 samples_loaded.append(dict(signs=sings_at_folder_sample, classes=classes))
 
         # achar o sample com maior frames
-        samples_frame = list(map(lambda x: [sp.shape[0] for sp in x['signs']], samples_loaded))
-        samples_frame = list(itertools.chain(*samples_frame))
+        samples_frame = list(map(lambda x: sum([sp.shape[0] for sp in x['signs']]), samples_loaded))
         max_frame_count = max(samples_frame)
         self.max_sample_length = max_frame_count
 
-        joints_name = samples_loaded[0]['signs'][0].keys() if self.joints_2_use is None else self.joints_2_use
-        # padding em todos com numero de frames inferior ao maior sample
-        for s_idx in range(len(samples_loaded)):
-            for s in range(len(samples_loaded[s_idx]['signs'])):
-                amount_absent_frames = max_frame_count - samples_loaded[s_idx]['signs'][s].shape[0]
-                if amount_absent_frames > 0:
-                    empty_df = pd.DataFrame({
-                        f: [self.none_rep] * amount_absent_frames
-                        for f in joints_name
-                    })
-                    samples_loaded[s_idx]['signs'][s] = empty_df.append(samples_loaded[s_idx]['signs'][s])
+        samples_join = []
+        classes_per_frame = []
+        for sample in samples_loaded:
+            x = pd.DataFrame()
+            y = []
+            for signs_in_sample, cls in zip(sample['signs'], sample['classes']):
+                x = x.append(signs_in_sample)
+                y.extend([cls] * signs_in_sample.shape[0])
 
-                    if clean_nan:
-                        sample = self.__clean_sample(sample)
+            samples_join.append(x)
+            classes_per_frame.append(y)
 
-                    if not self.angle_pose:
-                        sample = sample.applymap(DBLoader2NPY.parse_npy_vec_str)
+        joints_in_use = samples_join[0].keys() if self.joints_2_use is None else self.joints_2_use
+        for idx, sample in enumerate(samples_join):
+            amount_absent_frames = self.max_sample_length - sample.values.shape[0]
 
-                    if self.scaler_cls is not None and not self.angle_pose:
-                        sample = DBLoader2NPY.scale_single_sample(sample, self.scaler_cls)
+            if amount_absent_frames > 0:
+                empty_df = pd.DataFrame({
+                    f: [self.none_rep] * amount_absent_frames
+                    for f in joints_in_use
+                })
+                samples_join[idx] = empty_df.append(sample)
+                classes_per_frame[idx] = [self.pad_class] * amount_absent_frames + classes_per_frame[idx]
 
-                    if self.add_derivatives and self.angle_pose:
-                        sample = self.make_angle_derivative_sample(sample)
+        self.amount_frames_per_sequence = self.amount_frames_per_sequence \
+            if self.amount_frames_per_sequence is not None else self.max_sample_length
 
-                    if self.add_derivatives and not self.angle_pose:
-                        sample = self.make_xy_derivative_sample(sample)
+        online_sequence = []
+        online_sequence_classes = []
 
-        # e ajustar os Y para frame
-        return samples_loaded, cls_dirs
+        for sample, idx in zip(samples_join, classes_per_frame):
+            curr_frame_amount_online = []
+            curr_frame_amount_online_classes = []
+            for frame_idx in range(sample.shape[0]):
+                curr_frame_amount_online.append(sample.iloc[frame_idx])
+                print(curr_frame_amount_online)
+
+
+
+
+        return samples_join, classes_per_frame
 
     def __clean_sample(self, sample):
         """
@@ -191,42 +205,10 @@ class DBLoaderOnlineSequences:
 
         """
 
-        if pbar is not None:
-            pbar.reset(total=len(samples_idxs))
-            pbar.set_description('loading samples')
         X = []
         Y = []
         for idx in samples_idxs:
-            x, y = self.__load_sample_by_pos(idx, clean_nan=clean_nan)
-            if self.joints_2_use is not None:
-                x = x[self.joints_2_use]
-            if not self.angle_pose:
-                x = x.applymap(lambda c: c[:2] if type(c) is np.ndarray else c)
-
-                if self.samples_memory_xy_npy[idx] is None and as_npy:
-                    x = self.__stack_xy_pose_2_npy(x)
-                    self.samples_memory_xy_npy[idx] = x
-                elif self.samples_memory_xy_npy[idx] is not None and as_npy:
-                    x = self.samples_memory_xy_npy[idx]
-
-                X.append(x)
-            else:
-                X.append(x.drop(columns=['frame']).values if as_npy else x)
-            Y.append(y)
-
-        if as_npy:
-            shape_before = Y[0].shape
-            Y = np.concatenate(Y).reshape(len(samples_idxs), shape_before[0], shape_before[1])
-
-        if as_npy and self.angle_pose:
-            shape_before = X[0].shape
-            new_shape = [len(samples_idxs)]
-            new_shape.extend(list(shape_before))
-            new_shape = tuple(new_shape)
-            X = np.concatenate(X).reshape(new_shape)
-
-        if as_npy and not self.angle_pose:
-            X = np.stack(X, axis=0)
+            pass
 
         return X, Y
 
@@ -246,3 +228,6 @@ class DBLoaderOnlineSequences:
 class InternalKerasSequenceOnlineSequence(Sequence):
     pass
 
+
+if __name__ == '__main__':
+    DBLoaderOnlineSequences()

@@ -75,8 +75,8 @@ class DBLoader2NPY(Sequence):
         self.only_that_classes = only_that_classes
         self.shuffle = shuffle
 
-        self.samples_path, self.cls_dirs = DBLoader2NPY.read_all_db_folders(db_path, only_that_classes, angle_or_xy,
-                                                                            custom_internal_dir)
+        self.custom_internal_dir = custom_internal_dir
+        self.samples_path, self.cls_dirs = self._read_all_db_folders()
         self.all_samples_separated_ids = DBLoader2NPY.separate_samples_with_their_real_ids(self.samples_path,
                                                                                            len(self.cls_dirs))
         self.all_samples_ids = []
@@ -135,6 +135,9 @@ class DBLoader2NPY(Sequence):
             raise RuntimeError(error_msg)
 
         return cls_dirs
+
+    def _read_all_db_folders_internal(self):
+        return DBLoader2NPY.read_all_db_folders(self.db_path, self.only_that_classes, self.custom_internal_dir)
 
     @staticmethod
     def read_all_db_folders(db_path, only_that_classes, angle_or_xy, custom_internal_dir=None):
