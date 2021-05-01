@@ -3407,3 +3407,26 @@ cannot unpack non-iterable NoneType object
 cannot unpack non-iterable NoneType object
 cannot unpack non-iterable NoneType object
 cannot unpack non-iterable NoneType object
+cannot unpack non-iterable NoneType object
+cannot unpack non-iterable NoneType object
+cannot unpack non-iterable NoneType object
+[WinError 123] The filename, directory name, or volume label syntax is incorrect: 'D:/sign_db_front_view\\***'
+[WinError 123] The filename, directory name, or volume label syntax is incorrect: 'D:/sign_db_front_view\\PEGAR+\t'
+cannot unpack non-iterable NoneType object
+[WinError 123] The filename, directory name, or volume label syntax is incorrect: 'D:/sign_db_front_view\\***'
+[WinError 123] The filename, directory name, or volume label syntax is incorrect: 'D:/sign_db_front_view\\PEGAR+\t'
+[WinError 123] The filename, directory name, or volume label syntax is incorrect: 'D:/sign_db_front_view\\TRES-ANO*'
+cannot unpack non-iterable NoneType object
+[WinError 123] The filename, directory name, or volume label syntax is incorrect: 'D:/sign_db_front_view\\***'
+[WinError 123] The filename, directory name, or volume label syntax is incorrect: 'D:/sign_db_front_view\\PEGAR+\t'
+[WinError 123] The filename, directory name, or volume label syntax is incorrect: 'D:/sign_db_front_view\\TRES-ANO*'
+cannot unpack non-iterable NoneType object
+[WinError 123] The filename, directory name, or volume label syntax is incorrect: 'D:/sign_db_front_view\\***'
+[WinError 123] The filename, directory name, or volume label syntax is incorrect: 'D:/sign_db_front_view\\PEGAR+\t'
+[WinError 123] The filename, directory name, or volume label syntax is incorrect: 'D:/sign_db_front_view\\TRES-ANO*'
+[WinError 123] The filename, directory name, or volume label syntax is incorrect: 'D:/sign_db_front_view\\SINAL\t'
+cannot unpack non-iterable NoneType object
+[WinError 123] The filename, directory name, or volume label syntax is incorrect: 'D:/sign_db_front_view\\***'
+[WinError 123] The filename, directory name, or volume label syntax is incorrect: 'D:/sign_db_front_view\\PEGAR+\t'
+[WinError 123] The filename, directory name, or volume label syntax is incorrect: 'D:/sign_db_front_view\\TRES-ANO*'
+[WinError 123] The filename, directory name, or volume label syntax is incorrect: 'D:/sign_db_front_view\\SINAL\t'
