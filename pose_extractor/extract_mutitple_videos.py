@@ -572,25 +572,25 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description='All eaf parser')
     parser.add_argument('--db_path', type=str, help='a path to Libras Corpus',
-                        default='D:/libras corpus b2/LibrasCorpus')
+                        default='D:/libras corpus b2')
 
     parser.add_argument('--all_vids', type=str, help='sign df name',
-                        default='../all_videos.csv')
+                        default='all_videos4.csv')
 
     parser.add_argument('--openpose_path', type=str, help='sign df name',
-                        default='../pose_extractors')
+                        default='C:/Users/lucas/Documents/Projects/Libras/PoseExtractors/openpose')
 
     parser.add_argument('--path_to_save_dfs', type=str, help='sign df name',
                         default='../db/')
 
     args = parser.parse_args()
 
-    extractMultipleVideos = ExtractMultipleVideos(db_path='D:/libras corpus b2',
-                                                  all_videos='all_videos4.csv',
-                                                  openpose_path='C:/Users/lucas/Documents/Projects/Libras/PoseExtractors/openpose',
+    extractMultipleVideos = ExtractMultipleVideos(db_path=args.db_path,
+                                                  all_videos=args.all_vids,
+                                                  openpose_path=args.openpose_path,
                                                   vid_sync='vid_sync.csv',
                                                   # path_to_save_dfs='../sign_db_front_view',
-                                                  path_to_save_dfs='D:/sign_db_front_view',
+                                                  path_to_save_dfs=args.path_to_save_dfs,
                                                   # needed_signs_list=new_sign_list,
                                                   all_persons_subtitle='all_persons_from_subtitle.csv')
 
