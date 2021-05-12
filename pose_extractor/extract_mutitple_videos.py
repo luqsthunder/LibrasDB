@@ -583,12 +583,16 @@ if __name__ == '__main__':
     parser.add_argument('--path_to_save_dfs', type=str, help='sign df name',
                         default='../db/')
 
+    parser.add_argument('--gpus', type=int, help='amount of gpus to use',
+                        default=1)
+
     args = parser.parse_args()
 
     extractMultipleVideos = ExtractMultipleVideos(db_path=args.db_path,
                                                   all_videos=args.all_vids,
                                                   openpose_path=args.openpose_path,
                                                   vid_sync='vid_sync.csv',
+                                                  gpu_count=args.gpus,
                                                   # path_to_save_dfs='../sign_db_front_view',
                                                   path_to_save_dfs=args.path_to_save_dfs,
                                                   # needed_signs_list=new_sign_list,
