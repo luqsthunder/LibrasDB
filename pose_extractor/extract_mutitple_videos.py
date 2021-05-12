@@ -72,8 +72,8 @@ class ExtractMultipleVideos:
 
         all_v_parts = self.vid_sync.v_part.unique().tolist()
 
-        pbar_single_folder = tqdm(desc='single_folder', position=1, leave=False)
-        pbar_for_video_extraction = tqdm(desc='all_folders', total=len(all_v_parts), position=0)
+        pbar_single_folder = tqdm(desc='single_folder', position=1, leave=False, ncols=10)
+        pbar_for_video_extraction = tqdm(desc='all_folders', total=len(all_v_parts), position=0, ncols=10)
 
         for v_part in all_v_parts:
 
