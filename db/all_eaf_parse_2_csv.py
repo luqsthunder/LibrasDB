@@ -9,6 +9,7 @@ from concurrent.futures import ThreadPoolExecutor
 import multiprocessing
 from copy import deepcopy
 from colorama import init
+import argparse
 
 
 class AllEAFParser2CSV:
@@ -80,7 +81,8 @@ class AllEAFParser2CSV:
         res = [f.result() for f in futures]
         return res
 
-    def process(self, pbar=None, pbar_dup=None, path_to_save_sign_df='./', check_n_remove_dups=True):
+    def process(self, pbar=None, pbar_dup=None, path_to_save_sign_df='./',
+                sign_df_name='all_videos5.csv', check_n_remove_dups=True):
         """
         Funcao principal que processa todas as legendas.
 
@@ -170,7 +172,7 @@ class AllEAFParser2CSV:
 
         if check_n_remove_dups:
             path_2_dup_all_videos = os.path.join(path_to_save_sign_df,
-                                                 '../dupl-all_videos3.csv')
+                                                 f'../dupl-{sign_df_name}')
             libras_df.to_csv(path_2_dup_all_videos, index=False)
 
             if pbar_dup is not None:
@@ -196,7 +198,7 @@ class AllEAFParser2CSV:
             single_list_drop = list(set(single_list_drop))
             libras_df = libras_df.drop(single_list_drop)
 
-        path_2_all_videos = os.path.join(path_to_save_sign_df, '../all_videos3.csv')
+        path_2_all_videos = os.path.join(path_to_save_sign_df, f'../{sign_df_name}')
         libras_df.to_csv(path_2_all_videos, index=False)
 
     def remove_db_df_path_specific(self, df):
@@ -445,7 +447,16 @@ class AllEAFParser2CSV:
 if __name__ == '__main__':
     init()
 
-    db_cut_videos = AllEAFParser2CSV('D:/libras corpus/LibrasCorpus')
-    db_cut_videos.process(path_to_save_sign_df='./', check_n_remove_dups=False)
+    parser = argparse.ArgumentParser(description='All eaf parser')
+    parser.add_argument('--db_path', type=str, help='a path to Libras Corpus',
+                        default='D:/libras corpus b2/LibrasCorpus')
+
+    parser.add_argument('--sign_df', type=str, help='sign df name',
+                        default='all_videos.csv')
+    args = parser.parse_args()
+
+    db_cut_videos = AllEAFParser2CSV(args.db_path)
+    db_cut_videos.process(path_to_save_sign_df='./', check_n_remove_dups=False,
+                          sign_df_name=args.sign_df)
     print(db_cut_videos.bad_subs, file=open('bad_subs.txt', mode='w'))
     print(db_cut_videos.bad_videos, file=open('bad_videos.txt', mode='w'))

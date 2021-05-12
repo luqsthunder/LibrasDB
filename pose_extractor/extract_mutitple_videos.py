@@ -15,6 +15,7 @@ import cv2 as cv
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 from colorama import init
+import argparse
 
 
 class ExtractMultipleVideos:
@@ -568,8 +569,24 @@ if __name__ == '__main__':
         # 'OUVIR',
         # 'MÃE',
     ]
-    extractMultipleVideos = ExtractMultipleVideos(db_path='D:/libras corpus',
-                                                  all_videos='all_videos3.csv',
+
+    parser = argparse.ArgumentParser(description='All eaf parser')
+    parser.add_argument('--db_path', type=str, help='a path to Libras Corpus',
+                        default='D:/libras corpus b2/LibrasCorpus')
+
+    parser.add_argument('--all_vids', type=str, help='sign df name',
+                        default='../all_videos.csv')
+
+    parser.add_argument('--openpose_path', type=str, help='sign df name',
+                        default='../pose_extractors')
+
+    parser.add_argument('--path_to_save_dfs', type=str, help='sign df name',
+                        default='../db/')
+
+    args = parser.parse_args()
+
+    extractMultipleVideos = ExtractMultipleVideos(db_path='D:/libras corpus b2',
+                                                  all_videos='all_videos4.csv',
                                                   openpose_path='C:/Users/lucas/Documents/Projects/Libras/PoseExtractors/openpose',
                                                   vid_sync='vid_sync.csv',
                                                   # path_to_save_dfs='../sign_db_front_view',
