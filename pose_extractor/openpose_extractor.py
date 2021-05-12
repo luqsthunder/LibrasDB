@@ -111,6 +111,9 @@ class OpenposeExtractor:
                 self.op_wrapper.waitAndEmplace([datum])
 
             # Retrieve processed results from OpenPose wrapper
+            if type(datums) == float:
+                print('here')
+
             for d_id in range(0, len(datums)):
                 datum = datums[d_id]
                 self.op_wrapper.waitAndPop([datum])

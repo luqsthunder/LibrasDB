@@ -22,6 +22,7 @@ class ExtractSignsFromVideo:
 
 def process_single_sample(extractor, curr_video, beg, end, person_needed_id, pose_tracker, pbar=None, num_gpus=1):
 
+    num_gpus = int(num_gpus)
     frame_time = 1000 / curr_video.get(cv.CAP_PROP_FPS)
     frame_end_pos = end / frame_time
     succ = curr_video.set(cv.CAP_PROP_POS_FRAMES, float(beg / frame_time))
