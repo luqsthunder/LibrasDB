@@ -34,7 +34,7 @@ class OpenposeExtractor:
             params['face'] = 0
             params['render_pose'] = 0
             self.num_gpu = num_gpu
-            if num_gpu > 1:
+            if num_gpu > 0:
                 params['num_gpu'] = num_gpu
 
             # params["body"] = True
