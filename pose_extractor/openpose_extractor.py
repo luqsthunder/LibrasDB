@@ -105,16 +105,15 @@ class OpenposeExtractor:
         try:
             datums = []
             for im in im_list:
+                if im is None:
+                    continue
+
                 datum = op.Datum()
                 datum.cvInputData = im
                 datums.append(datum)
                 self.op_wrapper.waitAndEmplace([datum])
 
-            # Retrieve processed results from OpenPose wrapper
-            if type(datums) == float:
-                print('here')
-
-            for d_id in range(0, len(datums)):
+            for d_id in range(len(datums)):
                 datum = datums[d_id]
                 self.op_wrapper.waitAndPop([datum])
                 pose_list.append(datum)

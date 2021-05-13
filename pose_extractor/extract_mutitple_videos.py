@@ -144,12 +144,14 @@ class ExtractMultipleVideos:
 
             count += 1
 
-            folder_path = os.path.join(self.path_to_save_dfs, sign_row.sign.replace("?", "").replace(" ", ""))
-            front_file_name = f'{v_part}---{sign_row.sign.replace("?", "").replace(" ", "")}---{sign_row.beg}' \
-                              f'---{sign_row.end}---front---{sign_row.talker_id}.csv'
+            sign_name = str(sign_row.sign).replace("?", "").replace(" ", "")
+            beg = str(sign_row.beg)
+            end = str(sign_row.end)
+            talker_id = str(sign_row.talker_id)
+            folder_path = os.path.join(self.path_to_save_dfs, sign_name)
+            front_file_name = f'{v_part}---{sign_name}---{beg}---{end}---front---{talker_id}.csv'
 
-            side_file_name = f'{v_part}---{sign_row.sign.replace("?", "").replace(" ", "")}---{sign_row.beg}' \
-                             f'---{sign_row.end}---side---{sign_row.talker_id}.csv'
+            side_file_name = f'{v_part}---{sign_name}---{beg}---{end}---side---{talker_id}.csv'
 
             side_file_name = side_file_name.replace('\\', '')
             side_file_name = side_file_name.replace('/', '')
@@ -331,17 +333,17 @@ class ExtractMultipleVideos:
         last_msec_pos = curr_msec_pos
         while curr_msec_pos <= end_msec:
 
-            if self.gpu_count > 1:
+            if self.gpu_count > 0:
                 frames = []
                 msecs = []
-                for _ in range(self.gpu_count):
+                for it in range(self.gpu_count):
                     ret, frame = vid.read()
                     curr_msec_pos = vid.get(cv.CAP_PROP_POS_MSEC)
 
                     if curr_msec_pos >= end_msec:
                         break
 
-                    if not ret and len(frames) == 0:
+                    if not ret and it == 0:
                         return None
 
                     msecs.append(curr_msec_pos)

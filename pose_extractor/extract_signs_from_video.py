@@ -65,17 +65,17 @@ def process_single_sample(extractor, curr_video, beg, end, person_needed_id, pos
 
     while curr_video.get(cv.CAP_PROP_POS_FRAMES) <= frame_end_pos:
         curr_update_amount = num_gpus
-        if num_gpus > 1:
+        if num_gpus > 0:
             frames = []
             msecs = []
-            for _ in range(num_gpus):
+            for it in range(num_gpus):
                 ret, frame = curr_video.read()
                 curr_msec_pos = curr_video.get(cv.CAP_PROP_POS_MSEC)
 
                 if curr_msec_pos >= end:
                     break
 
-                if not ret and len(frames) == 0:
+                if not ret and it == 0:
                     return None
 
                 msecs.append(curr_msec_pos)
