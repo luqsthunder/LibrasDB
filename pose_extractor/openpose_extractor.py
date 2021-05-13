@@ -106,6 +106,7 @@ class OpenposeExtractor:
             datums = []
             for im in im_list:
                 if im is None:
+                    print('here continue')
                     continue
 
                 datum = op.Datum()
