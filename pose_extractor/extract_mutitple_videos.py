@@ -73,8 +73,9 @@ class ExtractMultipleVideos:
         all_v_parts = self.vid_sync.v_part.unique().tolist()
 
         if batch is not None and amount_batchs is not None:
-            beg = batch * amount_batchs
-            end = min(len(all_v_parts), batch * amount_batchs + amount_batchs)
+            total_amount_per_batch = len(all_v_parts) // amount_batchs
+            beg = batch * total_amount_per_batch
+            end = min(len(all_v_parts), batch * total_amount_per_batch + total_amount_per_batch)
             all_v_parts = all_v_parts[beg:end]
 
         pbar_single_folder = tqdm(desc='single_folder', position=1, leave=False, ncols=128)
