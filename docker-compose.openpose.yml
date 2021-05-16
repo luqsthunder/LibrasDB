@@ -6,7 +6,7 @@ services:
       context: ./DockerFolder
       dockerfile: Dockerfile.openpose
       volumes:
-        - /home/thunder/view/
+        - /home/thunder/:/app/
       deploy:
         resources:
           reservations:
