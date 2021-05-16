@@ -61,7 +61,7 @@ class ExtractMultipleVideos:
         self.needed_sings = needed_signs_list
         self.path_to_save_dfs = path_to_save_dfs
 
-    def process(self):
+    def process(self, batch=None, amount_batchs=None):
         """
         Extrai os sinais de todos os videos.
 
@@ -71,6 +71,11 @@ class ExtractMultipleVideos:
         """
 
         all_v_parts = self.vid_sync.v_part.unique().tolist()
+
+        if batch is not None and amount_batchs is not None:
+            beg = batch * amount_batchs
+            end = min(len(all_v_parts), batch * amount_batchs + amount_batchs)
+            all_v_parts = all_v_parts[beg:end]
 
         pbar_single_folder = tqdm(desc='single_folder', position=1, leave=False, ncols=128)
         pbar_for_video_extraction = tqdm(desc='all_folders', total=len(all_v_parts), position=0, ncols=128)
@@ -588,6 +593,12 @@ if __name__ == '__main__':
     parser.add_argument('--gpus', type=int, help='amount of gpus to use',
                         default=1)
 
+    parser.add_argument('--amount_batches', type=int, help='amount of batches',
+                        default=None)
+
+    parser.add_argument('--batch', type=int, help='batches',
+                        default=None)
+
     args = parser.parse_args()
 
     extractMultipleVideos = ExtractMultipleVideos(db_path=args.db_path,
@@ -601,7 +612,7 @@ if __name__ == '__main__':
                                                   all_persons_subtitle='all_persons_from_subtitle.csv')
 
     try:
-        extractMultipleVideos.process()
+        extractMultipleVideos.process(amount_batchs=args.amount_batches, batch=args.batch)
     except:
         print('LOOOL')
     # extractMultipleVideos.unittest_for___extract_sign_from_video_with_2_person()

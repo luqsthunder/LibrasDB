@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  extract_1b:
+    build:
+      context: ./DockerFolder
+      dockerfile: Dockerfile.openpose
+      volumes:
+        - /home/thunder/view/
+      deploy:
+        resources:
+          reservations:
+            devices:
+              - driver: nvidia
+                device_ids: ['0']
+                capabilities: [ gpu ]
