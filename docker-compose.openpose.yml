@@ -5,11 +5,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.openpose
-      command: python3 -u pose_extractor/extract_mutitple_videos.py \
-      --openpose_path=/openpose --db_path=../batches/db2 \
-      --all_vids=../all_vids_batch2.csv \
-      --path_to_save_dfs=../sign_db_front_view/sign_db_rig2 \
-      --gpus=1 --batch=0 --amount_batches=6
+      command: python3 -u pose_extractor/extract_mutitple_videos.py --openpose_path=/openpose --db_path=../batches/db2 --all_vids=../all_vids_batch2.csv --path_to_save_dfs=../sign_db_front_view/sign_db_rig2 --gpus=1 --batch=0 --amount_batches=6
     volumes:
       - /home/thunder/:/app/
     deploy:

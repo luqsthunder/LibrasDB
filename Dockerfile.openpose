@@ -17,4 +17,4 @@ COPY . .
 
 WORKDIR /app/LibrasDB
 
-ENTRYPOINT ["sh", "entrypoint.sh"]
+# ENTRYPOINT ["sh", "entrypoint.sh"]
