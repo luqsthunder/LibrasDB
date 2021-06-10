@@ -71,9 +71,9 @@ class OpenposeExtractor:
 
                 # No windows ';' é o separador de itens dentro da variavel do
                 # path.
-                os.environ['PATH'] = os.environ['PATH'] + ';' \
-                                     + openpose_build_path + 'x64/Release;' \
-                                     + openpose_build_path + 'bin;'
+                os.environ['PATH'] = os.environ['PATH'] + ';' + \
+                                     os.path.join(openpose_build_path, 'x64/Release') + ';' + \
+                                     os.path.join(openpose_build_path, 'bin') + ';'
 
                 import pyopenpose as op
             else:
