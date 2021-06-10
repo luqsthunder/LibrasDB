@@ -580,7 +580,7 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description='All eaf parser')
     parser.add_argument('--db_path', type=str, help='a path to Libras Corpus',
-                        default='D:/libras corpus b2')
+                        default='D:/libras corpus b3')
 
     parser.add_argument('--all_vids', type=str, help='sign df name',
                         default='all_videos4.csv')

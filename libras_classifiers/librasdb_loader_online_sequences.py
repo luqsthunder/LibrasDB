@@ -1,11 +1,12 @@
 import sys
 sys.path.append('.')
 
+import math
 import numpy as np
-import itertools
 from libras_classifiers.librasdb_loaders import DBLoader2NPY
 import os
 import pandas as pd
+from copy import deepcopy
 from tensorflow.keras.utils import Sequence
 
 
@@ -33,7 +34,7 @@ class DBLoaderOnlineSequences:
             no k-fold.
         """
         self.count = 0
-        self.none_rep = const_none_xy_rep if angle_pose else const_none_angle_rep
+        self.none_rep = const_none_xy_rep if not angle_pose else const_none_angle_rep
         self.db_path = db_path
         self.batch_size = batch_size
         self.make_k_fold = make_k_fold
@@ -106,6 +107,9 @@ class DBLoaderOnlineSequences:
                 x = x.append(signs_in_sample)
                 y.extend([cls] * signs_in_sample.shape[0])
 
+            if 'Unnamed: 0' in x.columns:
+                x = x.drop(['Unnamed: 0'], axis=1)
+
             samples_join.append(x)
             classes_per_frame.append(y)
 
@@ -121,21 +125,10 @@ class DBLoaderOnlineSequences:
                 samples_join[idx] = empty_df.append(sample)
                 classes_per_frame[idx] = [self.pad_class] * amount_absent_frames + classes_per_frame[idx]
 
-        self.amount_frames_per_sequence = self.amount_frames_per_sequence \
-            if self.amount_frames_per_sequence is not None else self.max_sample_length
-
-        online_sequence = []
-        online_sequence_classes = []
-
-        for sample, idx in zip(samples_join, classes_per_frame):
-            curr_frame_amount_online = []
-            curr_frame_amount_online_classes = []
-            for frame_idx in range(sample.shape[0]):
-                curr_frame_amount_online.append(sample.iloc[frame_idx])
-                print(curr_frame_amount_online)
-
-
-
+            if not self.angle_pose:
+                samples_join[idx] = samples_join[idx].applymap(DBLoader2NPY.parse_npy_vec_str)
+                samples_join[idx] = samples_join[idx].applymap(lambda c: c[:2] if type(c) is np.ndarray else c)
+                samples_join[idx] = DBLoader2NPY.stack_xy_pose_2_npy(samples_join[idx])
 
         return samples_join, classes_per_frame
 
@@ -167,7 +160,6 @@ class DBLoaderOnlineSequences:
             zero_rep = str(np.array([0., 0., 0.]))
             m_sample = m_sample.replace(zero_rep, np.nan)
 
-
         return m_sample.fillna(self.const_none_angle_rep
                                if self.angle_pose else xy_str_rep)
 
@@ -183,16 +175,12 @@ class DBLoaderOnlineSequences:
         joint_names = self.samples[0][0].keys() if self.joints_2_use is None else self.joints_2_use
         return joint_names
 
-    def batch_load_samples(self, samples_idxs, as_npy=True, clean_nan=True):
+    def batch_load_samples(self, samples_idxs, clean_nan=True):
         """
         Parameters
         ----------
         samples_idxs : list
             Lista dos ids a serem retornados.
-
-        as_npy: bool
-            Boleano que indica se deve retornar um dataframe ou uma array de
-            numpy arrays.
 
         clean_nan : bool
             Boleano indicando se deve ser limpo as amostras com nulos.
@@ -207,22 +195,28 @@ class DBLoaderOnlineSequences:
 
         X = []
         Y = []
-        for idx in samples_idxs:
-            pass
 
         return X, Y
 
     def __getitem__(self, item):
-        pass
+        beg = item * self.batch_size
+
+        end = np.min([(item + 1) * self.batch_size, len(self.samples)])
+
+        x, y, = self.samples[beg:end], self.classes[beg:end]
+        return x, y, [None]
 
     def __len__(self):
-        pass
+        return math.ceil(len(self.samples) / self.batch_size)
 
     def on_epoch_end(self):
         pass
 
     def validation(self):
         return
+
+    def train(self):
+        pass
 
 
 class InternalKerasSequenceOnlineSequence(Sequence):

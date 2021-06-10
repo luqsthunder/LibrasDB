@@ -419,7 +419,7 @@ class DBLoader2NPY(Sequence):
         return sample
 
     @staticmethod
-    def __stack_xy_pose_2_npy(sample: pd.DataFrame):
+    def stack_xy_pose_2_npy(sample: pd.DataFrame):
         """
         Enfileira os valores de uma amostra de pose-XY em um formato numpy. Descartando o atributo relacionado aos
         quadros (frames).
@@ -590,7 +590,7 @@ class DBLoader2NPY(Sequence):
                 x = x.applymap(lambda c: c[:2] if type(c) is np.ndarray else c)
 
                 if self.samples_memory_xy_npy[idx] is None and as_npy:
-                    x = self.__stack_xy_pose_2_npy(x)
+                    x = self.stack_xy_pose_2_npy(x)
                     self.samples_memory_xy_npy[idx] = x
                 elif self.samples_memory_xy_npy[idx] is not None and as_npy:
                     x = self.samples_memory_xy_npy[idx]
