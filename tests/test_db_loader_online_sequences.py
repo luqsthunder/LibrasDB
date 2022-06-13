@@ -5,11 +5,15 @@ class TestDBLoaderOnlineSequences:
     db = None
 
     def setup(self):
-        self.db = DBLoaderOnlineSequences(db_path='../libras-db-folders-online-debug', batch_size=1)
+        self.db = DBLoaderOnlineSequences(
+            db_path="../libras-db-folders-online-debug", batch_size=1
+        )
 
     def test_constructor(self):
         try:
-            db = DBLoaderOnlineSequences(db_path='../libras-db-folders-online-debug', batch_size=1)
+            db = DBLoaderOnlineSequences(
+                db_path="../libras-db-folders-online-debug", batch_size=1
+            )
             if self.db is None:
                 self.db = db
             assert True

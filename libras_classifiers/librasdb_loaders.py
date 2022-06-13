@@ -19,11 +19,26 @@ class DBLoader2NPY(Sequence):
     Diferenciar representação das poses XY para ângulo.
     """
 
-    def __init__(self, db_path, batch_size, angle_pose=True, no_hands=True, joints_2_use=None,
-                 shuffle=False, test_size=0.3, add_derivatives=False,
-                 maintain_memory=True, make_k_fold=False, k_fold_amount=None, only_that_classes=None,
-                 scaler_cls=None, not_use_pbar_in_load=False, custom_internal_dir=None, const_none_angle_rep=0,
-                 const_none_xy_rep=np.array([0, 0, 0])):
+    def __init__(
+        self,
+        db_path,
+        batch_size,
+        angle_pose=True,
+        no_hands=True,
+        joints_2_use=None,
+        shuffle=False,
+        test_size=0.3,
+        add_derivatives=False,
+        maintain_memory=True,
+        make_k_fold=False,
+        k_fold_amount=None,
+        only_that_classes=None,
+        scaler_cls=None,
+        not_use_pbar_in_load=False,
+        custom_internal_dir=None,
+        const_none_angle_rep=0,
+        const_none_xy_rep=np.array([0, 0, 0]),
+    ):
         """
         Parameters
         ----------
@@ -58,18 +73,19 @@ class DBLoader2NPY(Sequence):
 
         """
         self.count = 0
-        self.db_path = db_path; self.const_none_angle_rep = const_none_angle_rep
+        self.db_path = db_path
+        self.const_none_angle_rep = const_none_angle_rep
         self.const_none_xy_rep = const_none_xy_rep
         self.angle_pose = angle_pose
         self.batch_size = batch_size
-        self.make_k_fold = make_k_fold; self.k_fold_amount = k_fold_amount
+        self.make_k_fold = make_k_fold
+        self.k_fold_amount = k_fold_amount
         self.joints_2_use = joints_2_use
         self.add_derivatives = add_derivatives
         self.scaler_cls = scaler_cls
 
-        angle_or_xy = 'angle' if angle_pose else 'xy'
-        angle_or_xy = 'no_hands-' + angle_or_xy \
-            if no_hands else 'hands-' + angle_or_xy
+        angle_or_xy = "angle" if angle_pose else "xy"
+        angle_or_xy = "no_hands-" + angle_or_xy if no_hands else "hands-" + angle_or_xy
         self.angle_or_xy = angle_or_xy
         self.cls_dirs = []
         self.only_that_classes = only_that_classes
@@ -77,8 +93,9 @@ class DBLoader2NPY(Sequence):
 
         self.custom_internal_dir = custom_internal_dir
         self.samples_path, self.cls_dirs = self._read_all_db_folders()
-        self.all_samples_separated_ids = DBLoader2NPY.separate_samples_with_their_real_ids(self.samples_path,
-                                                                                           len(self.cls_dirs))
+        self.all_samples_separated_ids = DBLoader2NPY.separate_samples_with_their_real_ids(
+            self.samples_path, len(self.cls_dirs)
+        )
         self.all_samples_ids = []
 
         self.maintain_memory = maintain_memory
@@ -89,25 +106,36 @@ class DBLoader2NPY(Sequence):
         self.weight_2_samples = None
 
         if self.angle_pose and self.add_derivatives and self.joints_2_use is not None:
-            self.joints_2_use = self.joints_2_use + [f'DP-DT-{x}' for x in self.joints_2_use if x != 'frame']
+            self.joints_2_use = self.joints_2_use + [
+                f"DP-DT-{x}" for x in self.joints_2_use if x != "frame"
+            ]
 
         self.k_fold_iteration = 0
         self.k_folder = None
 
         self.y = np.array([x[1] for x in self.samples_path])
         self.x = np.array([it for it in range(len(self.samples_path))])
-        self._train_ids, self._val_ids, self._y_train, self._y_test = \
-            sk.model_selection.train_test_split(self.x, self.y, test_size=test_size, random_state=5, stratify=self.y)
+        (
+            self._train_ids,
+            self._val_ids,
+            self._y_train,
+            self._y_test,
+        ) = sk.model_selection.train_test_split(
+            self.x, self.y, test_size=test_size, random_state=5, stratify=self.y
+        )
         if self.make_k_fold:
             self.k_folder = StratifiedKFold(n_splits=self.k_fold_amount, shuffle=False)
-           #self.train_set, self.val_set = self.k_fold_samples()
+        # self.train_set, self.val_set = self.k_fold_samples()
 
-        print('separated_samples')
+        print("separated_samples")
 
     @staticmethod
-    def separate_samples_with_their_real_ids(all_samples, amount_classes, get_y_array=False):
+    def separate_samples_with_their_real_ids(
+        all_samples, amount_classes, get_y_array=False
+    ):
         all_sample_separated = [
-            [key for key, x in enumerate(all_samples) if x[1] == it] for it in range(amount_classes)
+            [key for key, x in enumerate(all_samples) if x[1] == it]
+            for it in range(amount_classes)
         ]
 
         if get_y_array:
@@ -122,25 +150,33 @@ class DBLoader2NPY(Sequence):
             if only_that_classes is not None:
                 cls_dirs = list(filter(lambda x: x in only_that_classes, cls_dirs))
             if len(cls_dirs) == 0:
-                raise RuntimeError(f'Classes that was required it was not found. This was required classes that was '
-                                   f'given {only_that_classes}, and this is the db_path: {db_path}')
+                raise RuntimeError(
+                    f"Classes that was required it was not found. This was required classes that was "
+                    f"given {only_that_classes}, and this is the db_path: {db_path}"
+                )
 
             cls_dirs = [os.path.join(db_path, x) for x in cls_dirs]
             cls_dirs = list(filter(os.path.isdir, cls_dirs))
         except (FileNotFoundError, NotADirectoryError) as e:
-            error_msg = '\n error in constructor DBLoader2NPY ' \
-                        'using db_path {} \n ' \
-                        'using pose as {}'.format(db_path, angle_or_xy)
+            error_msg = (
+                "\n error in constructor DBLoader2NPY "
+                "using db_path {} \n "
+                "using pose as {}".format(db_path, angle_or_xy)
+            )
             print(e, error_msg)
             raise RuntimeError(error_msg)
 
         return cls_dirs
 
     def _read_all_db_folders_internal(self):
-        return DBLoader2NPY.read_all_db_folders(self.db_path, self.only_that_classes, self.custom_internal_dir)
+        return DBLoader2NPY.read_all_db_folders(
+            self.db_path, self.only_that_classes, self.custom_internal_dir
+        )
 
     @staticmethod
-    def read_all_db_folders(db_path, only_that_classes, angle_or_xy, custom_internal_dir=None):
+    def read_all_db_folders(
+        db_path, only_that_classes, angle_or_xy, custom_internal_dir=None
+    ):
         """
 
         Parameters
@@ -160,15 +196,16 @@ class DBLoader2NPY(Sequence):
         for it, class_dir in enumerate(cls_dirs):
             # aqui setamos o diretorio interno caso exista um, no caso de não existir seguimos o padrão de: xy_pose
             # para poses completas, angle_pose para as poses com angulos, no_hand-xy_pose para as poses xy sem as mãos.
-            internal_dir = angle_or_xy if custom_internal_dir is None else custom_internal_dir
+            internal_dir = (
+                angle_or_xy if custom_internal_dir is None else custom_internal_dir
+            )
             dir_to_walk = os.path.join(class_dir, internal_dir)
-            all_samples_in_class = [os.path.join(dir_to_walk, x)
-                                    for x in os.listdir(dir_to_walk)]
-            all_samples_in_class = list(filter(os.path.isfile,
-                                               all_samples_in_class))
+            all_samples_in_class = [
+                os.path.join(dir_to_walk, x) for x in os.listdir(dir_to_walk)
+            ]
+            all_samples_in_class = list(filter(os.path.isfile, all_samples_in_class))
             samples_class = [it] * len(all_samples_in_class)
-            all_samples_in_class = list(zip(all_samples_in_class,
-                                            samples_class))
+            all_samples_in_class = list(zip(all_samples_in_class, samples_class))
             samples_path.extend(all_samples_in_class)
 
         return samples_path, cls_dirs
@@ -187,7 +224,9 @@ class DBLoader2NPY(Sequence):
         """
         if self.longest_sample is None:
             db_idx = [x for x in range(len(self.samples_path))]
-            len_size, y = self.batch_load_samples(db_idx, as_npy=False, pbar=tqdm() if not no_pbar else None)
+            len_size, y = self.batch_load_samples(
+                db_idx, as_npy=False, pbar=tqdm() if not no_pbar else None
+            )
             len_size = max(len_size, key=lambda x: x.shape[0]).shape[0]
             return len_size
         else:
@@ -212,10 +251,9 @@ class DBLoader2NPY(Sequence):
 
         cls_as_labels = np.array(cls_as_labels)
 
-        cls_weight = \
-            sk.utils.class_weight.compute_class_weight('balanced',
-                                                       np.unique(cls_as_labels),
-                                                       cls_as_labels)
+        cls_weight = sk.utils.class_weight.compute_class_weight(
+            "balanced", np.unique(cls_as_labels), cls_as_labels
+        )
         return cls_weight
 
     def db_length(self):
@@ -237,7 +275,11 @@ class DBLoader2NPY(Sequence):
         joint_names: List
             Lista com nome das juntas utilizadas no carregador.
         """
-        joint_names = self.__load_sample_by_pos(0)[0].keys() if self.joints_2_use is None else self.joints_2_use
+        joint_names = (
+            self.__load_sample_by_pos(0)[0].keys()
+            if self.joints_2_use is None
+            else self.joints_2_use
+        )
         return joint_names
 
     def amount_classes(self):
@@ -268,12 +310,12 @@ class DBLoader2NPY(Sequence):
         m_sample = sample.copy()
 
         if not self.angle_pose:
-            zero_rep = str(np.array([0., 0., 0.]))
+            zero_rep = str(np.array([0.0, 0.0, 0.0]))
             m_sample = m_sample.replace(zero_rep, np.nan)
 
-
-        return m_sample.fillna(self.const_none_angle_rep
-                               if self.angle_pose else xy_str_rep)
+        return m_sample.fillna(
+            self.const_none_angle_rep if self.angle_pose else xy_str_rep
+        )
 
     def __load_sample(self, class_name, num, clean_nan=True):
         """
@@ -293,23 +335,22 @@ class DBLoader2NPY(Sequence):
         """
         cls_begin_pos = 0
         for x in self.cls_dirs:
-            if x[len(self.db_path):] == class_name:
+            if x[len(self.db_path) :] == class_name:
                 break
             dir_to_walk = os.path.join(x, self.angle_or_xy)
             cls_begin_pos += len(os.listdir(dir_to_walk))
 
-        return self.__load_sample_by_pos(cls_begin_pos + num,
-                                         clean_nan=clean_nan)
+        return self.__load_sample_by_pos(cls_begin_pos + num, clean_nan=clean_nan)
 
     @staticmethod
     def parse_npy_vec_str(str_array_like):
         if not isinstance(str_array_like, str):
             return str_array_like
 
-        res = str_array_like[1:len(str_array_like) - 1].split(' ')
+        res = str_array_like[1 : len(str_array_like) - 1].split(" ")
         recovered_np_array = []
         for r in res:
-            if r == '' or ' ' in r:
+            if r == "" or " " in r:
                 continue
             f = float(r)
             recovered_np_array.append(f)
@@ -332,7 +373,7 @@ class DBLoader2NPY(Sequence):
         sample = None
         if self.samples_memory[pos] is None and self.maintain_memory:
             sample = pd.read_csv(self.samples_path[pos][0])
-            sample = sample.set_index('Unnamed: 0')
+            sample = sample.set_index("Unnamed: 0")
             if clean_nan:
                 sample = self.__clean_sample(sample)
 
@@ -354,7 +395,7 @@ class DBLoader2NPY(Sequence):
             sample = self.samples_memory[pos]
         else:
             sample = pd.read_csv(self.samples_path[pos][0])
-            sample = sample.set_index('Unnamed: 0')
+            sample = sample.set_index("Unnamed: 0")
             if clean_nan:
                 sample = self.__clean_sample(sample)
 
@@ -367,7 +408,7 @@ class DBLoader2NPY(Sequence):
             if not self.angle_pose:
                 sample = sample.applymap(self.parse_npy_vec_str)
 
-        class_vec = np.zeros((len(self.cls_dirs), ))
+        class_vec = np.zeros((len(self.cls_dirs),))
         idx_test = self.samples_path[pos][1]
         class_vec[idx_test] = 1
         return sample, class_vec.reshape((-1, 1))
@@ -388,30 +429,33 @@ class DBLoader2NPY(Sequence):
 
             if amount_absent_frames > 0:
 
-                na_rep = self.const_none_angle_rep if self.angle_pose \
+                na_rep = (
+                    self.const_none_angle_rep
+                    if self.angle_pose
                     else self.const_none_xy_rep
+                )
 
-                empty_df = pd.DataFrame({
-                    f: [na_rep] * amount_absent_frames
-                    for f in self.joints_used()
-                })
+                empty_df = pd.DataFrame(
+                    {f: [na_rep] * amount_absent_frames for f in self.joints_used()}
+                )
 
-                self.samples_memory[it] = empty_df.append(sample,
-                                                          ignore_index=True)
+                self.samples_memory[it] = empty_df.append(sample, ignore_index=True)
 
     @staticmethod
     def scale_single_sample(sample, scale_cls, scale_kwargs={}):
-        all_frames = sample['frame'].unique().tolist()
+        all_frames = sample["frame"].unique().tolist()
         for frame in all_frames:
             curr_pose = sample[sample.frame == frame]
             all_x_from_this_frame = [x[0] for x in curr_pose.values[0][2:]]
             all_y_from_this_frame = [x[1] for x in curr_pose.values[0][2:]]
             xscaler = scale_cls(**scale_kwargs)
-            res_x = xscaler.fit(np.array(all_x_from_this_frame).reshape((-1, 1))) \
-                           .transform(np.array(all_x_from_this_frame).reshape((-1, 1)))
+            res_x = xscaler.fit(
+                np.array(all_x_from_this_frame).reshape((-1, 1))
+            ).transform(np.array(all_x_from_this_frame).reshape((-1, 1)))
 
-            res_y = xscaler.fit(np.array(all_y_from_this_frame).reshape((-1, 1))) \
-                           .transform(np.array(all_y_from_this_frame).reshape((-1, 1)))
+            res_y = xscaler.fit(
+                np.array(all_y_from_this_frame).reshape((-1, 1))
+            ).transform(np.array(all_y_from_this_frame).reshape((-1, 1)))
 
             for it in range(len(curr_pose.values[0][2:])):
                 curr_pose.values[0][it + 2][:2] = [res_x[it], res_y[it]]
@@ -453,7 +497,7 @@ class DBLoader2NPY(Sequence):
         return np.stack(sample_in_npy, axis=0)
 
     @staticmethod
-    def make_angle_derivative_sample(sample, padding='zeros') -> pd.DataFrame:
+    def make_angle_derivative_sample(sample, padding="zeros") -> pd.DataFrame:
         """
 
         Parameters
@@ -466,14 +510,16 @@ class DBLoader2NPY(Sequence):
 
         """
         # colocar todos os dados da amostra em um dicionario para construir um novo dataframe.
-        sample_data_in_dict = {key: sample[key].values.tolist() for key in sample.keys()}
+        sample_data_in_dict = {
+            key: sample[key].values.tolist() for key in sample.keys()
+        }
 
         # obter todas as linhas da amostra para iterar nelas na construição das derivadas
         all_rows_in_sample = [x[1] for x in sample.iterrows()]
         new_keys = all_rows_in_sample[1] - all_rows_in_sample[0]
-        sample_data_in_dict.update({
-            f'DP-DT-{key}': [] for key in new_keys.keys() if key != 'frame'
-        })
+        sample_data_in_dict.update(
+            {f"DP-DT-{key}": [] for key in new_keys.keys() if key != "frame"}
+        )
 
         for it in range(0, sample.shape[0] - 1):
             # obtém cada linha para calcular a derivada finita.
@@ -483,28 +529,28 @@ class DBLoader2NPY(Sequence):
             # derivada é construida aki
             new_row_dt = row_1 - row_0
             for key in new_row_dt.keys():
-                if key == 'frame':
+                if key == "frame":
                     continue
 
-                sample_data_in_dict[f'DP-DT-{key}'].append(new_row_dt[key])
+                sample_data_in_dict[f"DP-DT-{key}"].append(new_row_dt[key])
 
-        if padding == 'zeros':
+        if padding == "zeros":
             for key in new_keys.keys():
-                if key == 'frame':
+                if key == "frame":
                     continue
-                sample_data_in_dict[f'DP-DT-{key}'].append(0)
-        elif padding == 'cut_last':
+                sample_data_in_dict[f"DP-DT-{key}"].append(0)
+        elif padding == "cut_last":
             for key in sample.keys():
-                if key == 'frame':
+                if key == "frame":
                     continue
                 sample_data_in_dict[key].pop()
         else:
-            raise TypeError(f'worng padding type PADDING TYPE -> {padding}')
+            raise TypeError(f"worng padding type PADDING TYPE -> {padding}")
 
         return pd.DataFrame(sample_data_in_dict)
 
     @staticmethod
-    def make_xy_derivative_sample(sample, padding='zeros') -> pd.DataFrame:
+    def make_xy_derivative_sample(sample, padding="zeros") -> pd.DataFrame:
         """
 
         Parameters
@@ -518,14 +564,16 @@ class DBLoader2NPY(Sequence):
         """
 
         # colocar todos os dados da amostra em um dicionario para construir um novo dataframe.
-        sample_data_in_dict = {key: sample[key].values.tolist() for key in sample.keys()}
+        sample_data_in_dict = {
+            key: sample[key].values.tolist() for key in sample.keys()
+        }
 
         # obter todas as linhas da amostra para iterar nelas na construição das derivadas
         all_rows_in_sample = [x[1] for x in sample.iterrows()]
         new_keys = all_rows_in_sample[1] - all_rows_in_sample[0]
-        sample_data_in_dict.update({
-            f'DXY-DT-{key}': [] for key in new_keys.keys() if key != 'frame'
-        })
+        sample_data_in_dict.update(
+            {f"DXY-DT-{key}": [] for key in new_keys.keys() if key != "frame"}
+        )
 
         for it in range(0, sample.shape[0] - 1):
             # obtém cada linha para calcular a derivada finita.
@@ -535,27 +583,29 @@ class DBLoader2NPY(Sequence):
             # derivada é construida aki
             new_row_dt = row_1 - row_0
             for key in new_row_dt.keys():
-                if key == 'frame':
+                if key == "frame":
                     continue
 
-                sample_data_in_dict[f'DXY-DT-{key}'].append(new_row_dt[key])
+                sample_data_in_dict[f"DXY-DT-{key}"].append(new_row_dt[key])
 
-        if padding == 'zeros':
+        if padding == "zeros":
             for key in new_keys.keys():
-                if key == 'frame':
+                if key == "frame":
                     continue
-                sample_data_in_dict[f'DXY-DT-{key}'].append(np.array([0.0, 0.0, 0.0]))
-        elif padding == 'cut_last':
+                sample_data_in_dict[f"DXY-DT-{key}"].append(np.array([0.0, 0.0, 0.0]))
+        elif padding == "cut_last":
             for key in sample.keys():
-                if key == 'frame':
+                if key == "frame":
                     continue
                 sample_data_in_dict[key].pop()
         else:
-            raise TypeError(f'worng padding type PADDING TYPE -> {padding}')
+            raise TypeError(f"worng padding type PADDING TYPE -> {padding}")
 
         return pd.DataFrame(sample_data_in_dict)
 
-    def batch_load_samples(self, samples_idxs, as_npy=True, clean_nan=True, pbar: tqdm = None):
+    def batch_load_samples(
+        self, samples_idxs, as_npy=True, clean_nan=True, pbar: tqdm = None
+    ):
         """
         Parameters
         ----------
@@ -579,7 +629,7 @@ class DBLoader2NPY(Sequence):
 
         if pbar is not None:
             pbar.reset(total=len(samples_idxs))
-            pbar.set_description('loading samples')
+            pbar.set_description("loading samples")
         X = []
         Y = []
         for idx in samples_idxs:
@@ -597,7 +647,7 @@ class DBLoader2NPY(Sequence):
 
                 X.append(x)
             else:
-                X.append(x.drop(columns=['frame']).values if as_npy else x)
+                X.append(x.drop(columns=["frame"]).values if as_npy else x)
             Y.append(y)
 
             if pbar is not None:
@@ -606,7 +656,9 @@ class DBLoader2NPY(Sequence):
 
         if as_npy:
             shape_before = Y[0].shape
-            Y = np.concatenate(Y).reshape(len(samples_idxs), shape_before[0], shape_before[1])
+            Y = np.concatenate(Y).reshape(
+                len(samples_idxs), shape_before[0], shape_before[1]
+            )
 
         if as_npy and self.angle_pose:
             shape_before = X[0].shape
@@ -625,7 +677,7 @@ class DBLoader2NPY(Sequence):
 
         end = np.min([(index + 1) * self.batch_size, self.db_length()])
 
-        x, y = self.batch_load_samples(self.x[beg: end])
+        x, y = self.batch_load_samples(self.x[beg:end])
         return x, y, [None]
 
     def __len__(self):
@@ -659,9 +711,9 @@ class InternalBaseKerasIterator(Sequence):
 
         end = np.min([(index + 1) * self.parent.batch_size, len(self.ids)])
 
-        x, y = self.parent.batch_load_samples(self.ids[beg: end])
+        x, y = self.parent.batch_load_samples(self.ids[beg:end])
 
-        return x, y #[None] if tf.__version__.split('.')[1] == 1 else x, y
+        return x, y  # [None] if tf.__version__.split('.')[1] == 1 else x, y
 
     def __len__(self):
         return math.ceil(len(self.ids) / self.parent.batch_size)

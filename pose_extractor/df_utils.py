@@ -3,9 +3,15 @@ from pose_extractor.openpose_extractor import DatumLike
 from pose_extractor.all_parts import *
 
 
-def update_xy_pose_df(datum: DatumLike, df: pd.DataFrame, frame: int,
-                      person_id: int, person_pos_id: int, body_parts: list,
-                      hand_parts: list):
+def update_xy_pose_df(
+    datum: DatumLike,
+    df: pd.DataFrame,
+    frame: int,
+    person_id: int,
+    person_pos_id: int,
+    body_parts: list,
+    hand_parts: list,
+):
     """
     Adiciona uma linha no dataframe (df) contendo a pessoa, frame e as juntas
     do corpo e da mão caso utilizadas.
@@ -43,10 +49,7 @@ def update_xy_pose_df(datum: DatumLike, df: pd.DataFrame, frame: int,
         dataframe atual com a linha da pose adicionada a ele.
     """
 
-    pose_dic = {
-        'person': [person_id],
-        'frame': [frame]
-    }
+    pose_dic = {"person": [person_id], "frame": [frame]}
 
     pose_dic.update(make_dict_body_parts(datum, body_parts, person_pos_id))
 
@@ -58,10 +61,15 @@ def update_xy_pose_df(datum: DatumLike, df: pd.DataFrame, frame: int,
     return df.append(pose_df, ignore_index=True)
 
 
-def update_xy_pose_df_single_person(datum: DatumLike, df: pd.DataFrame,
-                                    frame: int, person_pos_id: int,
-                                    hand_pos_id: int, body_parts: list,
-                                    hand_parts: list):
+def update_xy_pose_df_single_person(
+    datum: DatumLike,
+    df: pd.DataFrame,
+    frame: int,
+    person_pos_id: int,
+    hand_pos_id: int,
+    body_parts: list,
+    hand_parts: list,
+):
     """
     Adiciona uma linha no dataframe (df) contendo a pessoa, frame e as juntas
     do corpo e da mão caso utilizadas.
@@ -96,9 +104,7 @@ def update_xy_pose_df_single_person(datum: DatumLike, df: pd.DataFrame,
         dataframe atual com a linha da pose adicionada a ele.
     """
 
-    pose_dic = {
-        'frame': [frame]
-    }
+    pose_dic = {"frame": [frame]}
 
     pose_dic.update(make_dict_body_parts(datum, body_parts, person_pos_id))
 
@@ -110,15 +116,16 @@ def update_xy_pose_df_single_person(datum: DatumLike, df: pd.DataFrame,
     return df.append(pose_df, ignore_index=True)
 
 
-def make_dict_body_parts(datum: DatumLike, body_parts: list,
-                         person_pos_id: int):
+def make_dict_body_parts(datum: DatumLike, body_parts: list, person_pos_id: int):
     pose_dic = {}
     for part in body_parts:
         if person_pos_id is not None:
             try:
-                joint = {part: [datum.poseKeypoints[person_pos_id,
-                                                    BODY_PARTS[part]]]#[: 2]]
-                         }
+                joint = {
+                    part: [
+                        datum.poseKeypoints[person_pos_id, BODY_PARTS[part]]
+                    ]  # [: 2]]
+                }
                 pose_dic.update(joint)
             except IndexError:
                 pose_dic.update({part: None})
@@ -128,28 +135,29 @@ def make_dict_body_parts(datum: DatumLike, body_parts: list,
     return pose_dic
 
 
-def make_dict_hand_parts(datum: DatumLike, hand_parts: list,
-                         person_pos_id: int):
+def make_dict_hand_parts(datum: DatumLike, hand_parts: list, person_pos_id: int):
     pose_dic = {}
     for part in hand_parts:
         if person_pos_id is not None:
             try:
-                joint_val = datum.handKeypoints[0][person_pos_id,
-                                                   HAND_PARTS[part]]#[: 2]
-                joint = {('right-' + part): [joint_val]}
+                joint_val = datum.handKeypoints[0][
+                    person_pos_id, HAND_PARTS[part]
+                ]  # [: 2]
+                joint = {("right-" + part): [joint_val]}
                 pose_dic.update(joint)
             except IndexError:
-                pose_dic.update({('right-' + part): None})
+                pose_dic.update({("right-" + part): None})
 
             try:
-                joint_val = datum.handKeypoints[1][person_pos_id,
-                                                   HAND_PARTS[part]]#[: 2]
-                joint = {('left-' + part): [joint_val]}
+                joint_val = datum.handKeypoints[1][
+                    person_pos_id, HAND_PARTS[part]
+                ]  # [: 2]
+                joint = {("left-" + part): [joint_val]}
                 pose_dic.update(joint)
             except IndexError:
-                pose_dic.update({('left-' + part): None})
+                pose_dic.update({("left-" + part): None})
         else:
-            pose_dic.update({('right-' + part): None})
-            pose_dic.update({('left-' + part): None})
+            pose_dic.update({("right-" + part): None})
+            pose_dic.update({("left-" + part): None})
 
     return pose_dic

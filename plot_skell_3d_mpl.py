@@ -13,15 +13,23 @@ import matplotlib.gridspec as gridspec
 from mpl_toolkits.mplot3d.axes3d import Axes3D
 from matplotlib.widgets import Slider, Button
 
-db_path = 'D:/gdrive/LibrasCorpus/Santa Catarina/Inventario Libras' \
-          '/ Inventário Nacional de Libras - Grande Florianópolis (Parte II) v1098'
+db_path = (
+    "D:/gdrive/LibrasCorpus/Santa Catarina/Inventario Libras"
+    "/ Inventário Nacional de Libras - Grande Florianópolis (Parte II) v1098"
+)
 
-front_data_path = 'v1098_barely_front_view_left_person.csv'
-side_data_path = 'v1098_side_view_left_person.csv'
+front_data_path = "v1098_barely_front_view_left_person.csv"
+side_data_path = "v1098_side_view_left_person.csv"
 
-video_left_data = cv.VideoCapture(os.path.join(db_path, 'FLN_G3_M2_entrevista_CAM3.mp4'))
-video_right_data = cv.VideoCapture(os.path.join(db_path, 'FLN_G3_M2_entrevista_CAM2.mp4'))
-video_front_data = cv.VideoCapture(os.path.join(db_path, 'FLN_G3_M2_entrevista_CAM1.mp4'))
+video_left_data = cv.VideoCapture(
+    os.path.join(db_path, "FLN_G3_M2_entrevista_CAM3.mp4")
+)
+video_right_data = cv.VideoCapture(
+    os.path.join(db_path, "FLN_G3_M2_entrevista_CAM2.mp4")
+)
+video_front_data = cv.VideoCapture(
+    os.path.join(db_path, "FLN_G3_M2_entrevista_CAM1.mp4")
+)
 
 # destination_path = f'./{person}_person_3d_{version}.csv'
 
@@ -34,12 +42,28 @@ left_side_data = left_side_data.applymap(DBLoader2NPY.parse_npy_vec_str)
 left_side_data.frame = left_front_data.frame
 
 # %%
-all_joints_to_save = ['Nose', 'Neck', 'RShoulder', 'RElbow', 'RWrist',
-                      'LShoulder', 'LElbow', 'LWrist', 'RHip', 'RKnee', 'RAnkle', 'LHip',
-                      'LKnee', 'LAnkle', 'REye', 'LEye', 'REar', 'LEar'
-                      ]
+all_joints_to_save = [
+    "Nose",
+    "Neck",
+    "RShoulder",
+    "RElbow",
+    "RWrist",
+    "LShoulder",
+    "LElbow",
+    "LWrist",
+    "RHip",
+    "RKnee",
+    "RAnkle",
+    "LHip",
+    "LKnee",
+    "LAnkle",
+    "REye",
+    "LEye",
+    "REar",
+    "LEar",
+]
 
-all_joints_to_use = ['RShoulder', 'RElbow', 'RWrist', 'LShoulder', 'LElbow', 'LWrist']
+all_joints_to_use = ["RShoulder", "RElbow", "RWrist", "LShoulder", "LElbow", "LWrist"]
 
 threshold = 0.60
 all_frames = left_front_data.frame.unique().tolist()
@@ -48,11 +72,11 @@ all_frames = left_front_data.frame.unique().tolist()
 matches = []
 
 for i in range(0, len(all_frames), 10):
-    row_front = left_front_data[left_front_data['frame'] == all_frames[i]]
+    row_front = left_front_data[left_front_data["frame"] == all_frames[i]]
     row_front = row_front[all_joints_to_use].values[0]
     row_front = [x if x[2] >= threshold else None for x in row_front]
 
-    row_side = left_side_data[left_side_data['frame'] == all_frames[i]]
+    row_side = left_side_data[left_side_data["frame"] == all_frames[i]]
     row_side = row_side[all_joints_to_use].values[0]
     row_side = [x if x[2] >= threshold else None for x in row_side]
 
@@ -69,12 +93,18 @@ def make_3dpoints(fx, fy, frame=0):
     camera_mat[0][0] = fx
     camera_mat[1][1] = fy
 
-    essential, inliers = cv.findEssentialMat(np.array([x[0] for x in matches]),
-                                             np.array([x[1] for x in matches]),
-                                             method=cv.RANSAC, cameraMatrix=camera_mat)
-    retval, R, t, mask2 = cv.recoverPose(essential, np.array([x[0] for x in matches]),
-                                         np.array([x[1] for x in matches]),
-                                         mask=inliers)  # , cameraMatrix=camera_mat)
+    essential, inliers = cv.findEssentialMat(
+        np.array([x[0] for x in matches]),
+        np.array([x[1] for x in matches]),
+        method=cv.RANSAC,
+        cameraMatrix=camera_mat,
+    )
+    retval, R, t, mask2 = cv.recoverPose(
+        essential,
+        np.array([x[0] for x in matches]),
+        np.array([x[1] for x in matches]),
+        mask=inliers,
+    )  # , cameraMatrix=camera_mat)
 
     projection1 = np.zeros((3, 4))
     projection1[:3, :3] = camera_mat
@@ -83,28 +113,37 @@ def make_3dpoints(fx, fy, frame=0):
     projection2[:3, :3] = R
     projection2[:, 3:] = t
 
-    dic = {
-        k: [] for k in left_front_data.keys() if k not in ['frame', 'Unnamed: 0']
-    }
+    dic = {k: [] for k in left_front_data.keys() if k not in ["frame", "Unnamed: 0"]}
 
     min_frame = left_front_data.frame[frame]
-    row_front = left_front_data[left_front_data['frame'] == min_frame]
-    row_front = row_front.drop(columns=['frame', 'Unnamed: 0'])
-    row_front = row_front.applymap(lambda x: np.array([0.0, 0.0, 0.0]) if isinstance(x, float) else x)
-    row_front = [(x.values[0] if x.values[0][2] >= threshold else None, key)
-                 for key, x in row_front.iteritems()]
+    row_front = left_front_data[left_front_data["frame"] == min_frame]
+    row_front = row_front.drop(columns=["frame", "Unnamed: 0"])
+    row_front = row_front.applymap(
+        lambda x: np.array([0.0, 0.0, 0.0]) if isinstance(x, float) else x
+    )
+    row_front = [
+        (x.values[0] if x.values[0][2] >= threshold else None, key)
+        for key, x in row_front.iteritems()
+    ]
 
-    row_side = left_side_data[left_side_data['frame'] == min_frame]
-    row_side = row_side.drop(columns=['frame', 'Unnamed: 0'])
-    row_side = row_side.applymap(lambda x: np.array([0.0, 0.0, 0.0]) if isinstance(x, float) else x)
-    row_side = [(x.values[0] if x.values[0][2] >= threshold else None, key)
-                for key, x in row_side.iteritems()]
+    row_side = left_side_data[left_side_data["frame"] == min_frame]
+    row_side = row_side.drop(columns=["frame", "Unnamed: 0"])
+    row_side = row_side.applymap(
+        lambda x: np.array([0.0, 0.0, 0.0]) if isinstance(x, float) else x
+    )
+    row_side = [
+        (x.values[0] if x.values[0][2] >= threshold else None, key)
+        for key, x in row_side.iteritems()
+    ]
 
     for front, side in zip(row_front, row_side):
         if front[0] is not None and side[0] is not None:
-            points3d = cv.triangulatePoints(projection1, projection2,
-                                            front[0][:2].reshape(1, 1, 2),
-                                            side[0][:2].reshape(1, 1, 2))
+            points3d = cv.triangulatePoints(
+                projection1,
+                projection2,
+                front[0][:2].reshape(1, 1, 2),
+                side[0][:2].reshape(1, 1, 2),
+            )
             dic[front[1]].append(points3d.T[0])
         else:
             dic[front[1]].append(None)
@@ -115,7 +154,7 @@ def make_3dpoints(fx, fy, frame=0):
 fig = plt.figure(figsize=(21, 9), dpi=720 // 9)
 gs = gridspec.GridSpec(3, 1)
 
-ax = fig.add_subplot(111, projection='3d')
+ax = fig.add_subplot(111, projection="3d")
 ax.set_position(gs[0:2].get_position(fig))
 ax.set_subplotspec(gs[0:2])
 
@@ -150,41 +189,57 @@ global lines
 
 # -------------------------------------------------------------------------
 chart = []
-colors = ['r', 'b', 'g', 'y', 'c', 'm', 'k', '#56004B', '#0B2B6B']
-bp = ['Nose', 'Neck', 'RShoulder', 'RElbow', 'RWrist', 'LShoulder', 'LElbow', '?', '??']
+colors = ["r", "b", "g", "y", "c", "m", "k", "#56004B", "#0B2B6B"]
+bp = ["Nose", "Neck", "RShoulder", "RElbow", "RWrist", "LShoulder", "LElbow", "?", "??"]
 i = 0
 for key in df_res.keys():
-    if df_res[key][0] is not None and df_res[key][0] is not None and df_res[key][0] is not None:
+    if (
+        df_res[key][0] is not None
+        and df_res[key][0] is not None
+        and df_res[key][0] is not None
+    ):
         chart.append(
-            ax.scatter(df_res[key][0][0], df_res[key][0][1], df_res[key][0][2], color=colors[i], label=bp[i], s=40))
+            ax.scatter(
+                df_res[key][0][0],
+                df_res[key][0][1],
+                df_res[key][0][2],
+                color=colors[i],
+                label=bp[i],
+                s=40,
+            )
+        )
         i += 1
 # -------------------------------------------------------------------------
 
 lines = []
 for pair in BODY_PAIRS:
     if df_res[pair[0]][0] is not None and df_res[pair[1]][0] is not None:
-        lines.append(ax.plot(
-            [df_res[pair[0]][0][0], df_res[pair[1]][0][0]],
-            [df_res[pair[0]][0][1], df_res[pair[1]][0][1]],
-            [df_res[pair[0]][0][2], df_res[pair[1]][0][2]],
-            color='k'
-        ))
+        lines.append(
+            ax.plot(
+                [df_res[pair[0]][0][0], df_res[pair[1]][0][0]],
+                [df_res[pair[0]][0][1], df_res[pair[1]][0][1]],
+                [df_res[pair[0]][0][2], df_res[pair[1]][0][2]],
+                color="k",
+            )
+        )
 
 ax.margins(x=0)
 
-axcolor = 'lightgoldenrodyellow'
+axcolor = "lightgoldenrodyellow"
 ax_fx = plt.axes([0.25, 0.1, 0.65, 0.03], facecolor=axcolor)
 ax_fy = plt.axes([0.25, 0.15, 0.65, 0.03], facecolor=axcolor)
 frame_num = plt.axes([0.25, 0.20, 0.65, 0.03], facecolor=axcolor)
 slider_scale = plt.axes([0.25, 0.25, 0.65, 0.03], facecolor=axcolor)
 ax_fxy = plt.axes([0.25, 0.05, 0.65, 0.03], facecolor=axcolor)
 
-slider_fx = Slider(ax_fx, 'Foco X (fx)', 1, 1000.0, valinit=f0, valstep=delta_fx)
-slider_fy = Slider(ax_fy, 'Foco Y (fy)', 1, 1000.0, valinit=f0, valstep=delta_fy)
-slider_frame = Slider(frame_num, 'Curr Frame', 0, 1000, valinit=f0, valstep=1.0)
-slider_scale = Slider(slider_scale, 'Escala dos eixos', 0, 1000, valinit=1)
+slider_fx = Slider(ax_fx, "Foco X (fx)", 1, 1000.0, valinit=f0, valstep=delta_fx)
+slider_fy = Slider(ax_fy, "Foco Y (fy)", 1, 1000.0, valinit=f0, valstep=delta_fy)
+slider_frame = Slider(frame_num, "Curr Frame", 0, 1000, valinit=f0, valstep=1.0)
+slider_scale = Slider(slider_scale, "Escala dos eixos", 0, 1000, valinit=1)
 
-slider_fxy = Slider(ax_fxy, 'Foco X e Y (fx e fy)', 1, 1000.0, valinit=f0, valstep=delta_fy)
+slider_fxy = Slider(
+    ax_fxy, "Foco X e Y (fx e fy)", 1, 1000.0, valinit=f0, valstep=delta_fy
+)
 
 video_left_data.set(cv.CAP_PROP_POS_MSEC, 5005 * 30)
 video_front_data.set(cv.CAP_PROP_POS_MSEC, 5005 * 30)
@@ -207,7 +262,7 @@ def update_fig(fx, fy, frame):
     global lines
     df_res = make_3dpoints(fx, fy, frame)
 
-    video_left_data.set(cv.CAP_PROP_POS_MSEC, frame + 5005* 30)
+    video_left_data.set(cv.CAP_PROP_POS_MSEC, frame + 5005 * 30)
     video_front_data.set(cv.CAP_PROP_POS_MSEC, frame + 5005 * 30)
 
     ret, left = video_left_data.read()
@@ -220,13 +275,35 @@ def update_fig(fx, fy, frame):
         chart[it].remove()
 
     chart = []
-    colors = ['r', 'b', 'g', 'y', 'c', 'm', 'k', '#56004B', '#0B2B6B']
-    bp = ['Nose', 'Neck', 'RShoulder', 'RElbow', 'RWrist', 'LShoulder', 'LElbow', '?', '??']
+    colors = ["r", "b", "g", "y", "c", "m", "k", "#56004B", "#0B2B6B"]
+    bp = [
+        "Nose",
+        "Neck",
+        "RShoulder",
+        "RElbow",
+        "RWrist",
+        "LShoulder",
+        "LElbow",
+        "?",
+        "??",
+    ]
     i = 0
     for key in df_res.keys():
-        if df_res[key][0] is not None and df_res[key][0] is not None and df_res[key][0] is not None:
-            chart.append(ax.scatter(df_res[key][0][0], df_res[key][0][1], df_res[key][0][2], color=colors[i],
-                                    label=bp[i], s=40))
+        if (
+            df_res[key][0] is not None
+            and df_res[key][0] is not None
+            and df_res[key][0] is not None
+        ):
+            chart.append(
+                ax.scatter(
+                    df_res[key][0][0],
+                    df_res[key][0][1],
+                    df_res[key][0][2],
+                    color=colors[i],
+                    label=bp[i],
+                    s=40,
+                )
+            )
             i += 1
     # -------------------------------------------------------------------------
     # chart.remove()
@@ -241,21 +318,35 @@ def update_fig(fx, fy, frame):
     lines = []
     for pair in BODY_PAIRS:
         if df_res[pair[0]][0] is not None and df_res[pair[1]][0] is not None:
-            lines.append(ax.plot(
-                [df_res[pair[0]][0][0], df_res[pair[1]][0][0]],
-                [df_res[pair[0]][0][1], df_res[pair[1]][0][1]],
-                [df_res[pair[0]][0][2], df_res[pair[1]][0][2]],
-                color='k'
-            ))
+            lines.append(
+                ax.plot(
+                    [df_res[pair[0]][0][0], df_res[pair[1]][0][0]],
+                    [df_res[pair[0]][0][1], df_res[pair[1]][0][1]],
+                    [df_res[pair[0]][0][2], df_res[pair[1]][0][2]],
+                    color="k",
+                )
+            )
 
-    x_min = min([df_res[key][0][0] for key in df_res.keys() if df_res[key][0] is not None])
-    x_max = max([df_res[key][0][0] for key in df_res.keys() if df_res[key][0] is not None])
+    x_min = min(
+        [df_res[key][0][0] for key in df_res.keys() if df_res[key][0] is not None]
+    )
+    x_max = max(
+        [df_res[key][0][0] for key in df_res.keys() if df_res[key][0] is not None]
+    )
 
-    y_min = min([df_res[key][0][1] for key in df_res.keys() if df_res[key][0] is not None])
-    y_max = max([df_res[key][0][1] for key in df_res.keys() if df_res[key][0] is not None])
+    y_min = min(
+        [df_res[key][0][1] for key in df_res.keys() if df_res[key][0] is not None]
+    )
+    y_max = max(
+        [df_res[key][0][1] for key in df_res.keys() if df_res[key][0] is not None]
+    )
 
-    z_min = min([df_res[key][0][2] for key in df_res.keys() if df_res[key][0] is not None])
-    z_max = max([df_res[key][0][2] for key in df_res.keys() if df_res[key][0] is not None])
+    z_min = min(
+        [df_res[key][0][2] for key in df_res.keys() if df_res[key][0] is not None]
+    )
+    z_max = max(
+        [df_res[key][0][2] for key in df_res.keys() if df_res[key][0] is not None]
+    )
 
     ax.axes.set_xlim3d(left=x_min, right=x_max)
     ax.axes.set_ylim3d(bottom=y_min, top=y_max)
@@ -285,7 +376,7 @@ slider_fxy.on_changed(update_fxy)
 # slider_scale.on_changed()
 
 resetax = plt.axes([0.8, 0.008, 0.1, 0.04])
-button = Button(resetax, 'Reset', color=axcolor, hovercolor='0.975')
+button = Button(resetax, "Reset", color=axcolor, hovercolor="0.975")
 
 
 def reset(event):

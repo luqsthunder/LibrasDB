@@ -1,6 +1,7 @@
 import sys
-sys.path.append('.')
-sys.path.append('pose_extractor')
+
+sys.path.append(".")
+sys.path.append("pose_extractor")
 
 from pose_extractor.df_utils import update_xy_pose_df_single_person
 from pose_extractor.openpose_extractor import OpenposeExtractor, DatumLike
@@ -19,10 +20,17 @@ import argparse
 
 
 class ExtractMultipleVideos:
-
-    def __init__(self, db_path: str, all_videos: pd.DataFrame or str, vid_sync: str or pd.DataFrame,
-                 all_persons_subtitle: str or pd.DataFrame, openpose_path: str,
-                 path_to_save_dfs: str, needed_signs_list: list = None, gpu_count: int = 1):
+    def __init__(
+        self,
+        db_path: str,
+        all_videos: pd.DataFrame or str,
+        vid_sync: str or pd.DataFrame,
+        all_persons_subtitle: str or pd.DataFrame,
+        openpose_path: str,
+        path_to_save_dfs: str,
+        needed_signs_list: list = None,
+        gpu_count: int = 1,
+    ):
         """
 
         Parameters
@@ -37,26 +45,39 @@ class ExtractMultipleVideos:
         """
 
         def remove_unnamed_0_col(df):
-            if 'Unnamed: 0' in df.keys():
-                return df.drop(columns=['Unnamed: 0'])
+            if "Unnamed: 0" in df.keys():
+                return df.drop(columns=["Unnamed: 0"])
             return df
 
         self.gpu_count = gpu_count
         self.db_path = db_path
-        self.all_videos = all_videos if isinstance(all_videos, pd.DataFrame) else pd.read_csv(all_videos)
+        self.all_videos = (
+            all_videos
+            if isinstance(all_videos, pd.DataFrame)
+            else pd.read_csv(all_videos)
+        )
         self.all_videos = remove_unnamed_0_col(self.all_videos)
 
         self.extractor = OpenposeExtractor(openpose_path=openpose_path)
 
-        self.vid_sync = vid_sync if isinstance(vid_sync, pd.DataFrame) else pd.read_csv(vid_sync)
+        self.vid_sync = (
+            vid_sync if isinstance(vid_sync, pd.DataFrame) else pd.read_csv(vid_sync)
+        )
         self.vid_sync = remove_unnamed_0_col(self.vid_sync)
 
-        self.all_persons_subtitle = all_persons_subtitle if isinstance(all_persons_subtitle, pd.DataFrame) \
+        self.all_persons_subtitle = (
+            all_persons_subtitle
+            if isinstance(all_persons_subtitle, pd.DataFrame)
             else pd.read_csv(all_persons_subtitle)
+        )
         self.all_persons_subtitle = remove_unnamed_0_col(self.all_persons_subtitle)
 
-        self.pose_centroid_tracker = PoseCentroidTracker(all_videos, all_videos, openpose_path=self.extractor,
-                                                         centroids_df_path='centroids.csv')
+        self.pose_centroid_tracker = PoseCentroidTracker(
+            all_videos,
+            all_videos,
+            openpose_path=self.extractor,
+            centroids_df_path="centroids.csv",
+        )
 
         self.needed_sings = needed_signs_list
         self.path_to_save_dfs = path_to_save_dfs
@@ -75,11 +96,18 @@ class ExtractMultipleVideos:
         if batch is not None and amount_batchs is not None:
             total_amount_per_batch = len(all_v_parts) // amount_batchs
             beg = batch * total_amount_per_batch
-            end = min(len(all_v_parts), batch * total_amount_per_batch + total_amount_per_batch)
+            end = min(
+                len(all_v_parts),
+                batch * total_amount_per_batch + total_amount_per_batch,
+            )
             all_v_parts = all_v_parts[beg:end]
 
-        pbar_single_folder = tqdm(desc='single_folder', position=1, leave=False, ncols=128)
-        pbar_for_video_extraction = tqdm(desc='all_folders', total=len(all_v_parts), position=0, ncols=128)
+        pbar_single_folder = tqdm(
+            desc="single_folder", position=1, leave=False, ncols=128
+        )
+        pbar_for_video_extraction = tqdm(
+            desc="all_folders", total=len(all_v_parts), position=0, ncols=128
+        )
 
         for v_part in all_v_parts:
 
@@ -89,11 +117,13 @@ class ExtractMultipleVideos:
                 continue
 
             try:
-                sings_in_folder = self._process_single_folder(v_part, pbar=pbar_single_folder)
+                sings_in_folder = self._process_single_folder(
+                    v_part, pbar=pbar_single_folder
+                )
             except Exception as e:
-                err_str = f'{e}'.encode("ascii", errors="ignore").decode()
+                err_str = f"{e}".encode("ascii", errors="ignore").decode()
                 print(err_str)
-                print(err_str, file=open('log.txt', mode='a'))
+                print(err_str, file=open("log.txt", mode="a"))
                 continue
             # for sign_df in sings_in_folder:
             #     folder_path = os.path.join(self.path_to_save_dfs, sign_df['sign_name'])
@@ -121,7 +151,9 @@ class ExtractMultipleVideos:
         """
 
         # aqui é encontrado o nome da pasta a partir do v_part dela no DF que contem, v_part, folder_name como chaves.
-        curr_folder = self.all_persons_subtitle[self.all_persons_subtitle.v_part == v_part].folder_name
+        curr_folder = self.all_persons_subtitle[
+            self.all_persons_subtitle.v_part == v_part
+        ].folder_name
         if curr_folder.shape[0] == 0:
             return []
 
@@ -131,17 +163,21 @@ class ExtractMultipleVideos:
         # encontrado os sinais que possuem dentro desse folder.
 
         if self.needed_sings is not None:
-            signs_in_folder = signs_in_folder[signs_in_folder.sign.isin(self.needed_sings)]
+            signs_in_folder = signs_in_folder[
+                signs_in_folder.sign.isin(self.needed_sings)
+            ]
 
         # id da pessoa a esquerda na legenda.
-        lf_id_subtitle = self.all_persons_subtitle[self.all_persons_subtitle.v_part == v_part].left_person.values[0]
+        lf_id_subtitle = self.all_persons_subtitle[
+            self.all_persons_subtitle.v_part == v_part
+        ].left_person.values[0]
 
         if signs_in_folder.shape[0] == 0:
             return []
 
         if pbar is not None:
             pbar.reset(total=signs_in_folder.shape[0])
-            pbar.set_description(f'single folder {v_part}')
+            pbar.set_description(f"single folder {v_part}")
 
         all_signs_pose_df = []
         count = 0
@@ -155,15 +191,19 @@ class ExtractMultipleVideos:
             end = str(sign_row.end)
             talker_id = str(sign_row.talker_id)
             folder_path = os.path.join(self.path_to_save_dfs, sign_name)
-            front_file_name = f'{v_part}---{sign_name}---{beg}---{end}---front---{talker_id}.csv'
+            front_file_name = (
+                f"{v_part}---{sign_name}---{beg}---{end}---front---{talker_id}.csv"
+            )
 
-            side_file_name = f'{v_part}---{sign_name}---{beg}---{end}---side---{talker_id}.csv'
+            side_file_name = (
+                f"{v_part}---{sign_name}---{beg}---{end}---side---{talker_id}.csv"
+            )
 
-            side_file_name = side_file_name.replace('\\', '')
-            side_file_name = side_file_name.replace('/', '')
+            side_file_name = side_file_name.replace("\\", "")
+            side_file_name = side_file_name.replace("/", "")
 
-            front_file_name = front_file_name.replace('\\', '')
-            front_file_name = front_file_name.replace('/', '')
+            front_file_name = front_file_name.replace("\\", "")
+            front_file_name = front_file_name.replace("/", "")
 
             front_file_path = os.path.join(folder_path, front_file_name)
             side_file_path = os.path.join(folder_path, side_file_name)
@@ -193,7 +233,7 @@ class ExtractMultipleVideos:
                     beg_msec=sign_row.beg,
                     end_msec=sign_row.end,
                     v_part=v_part,
-                    is_left=is_left
+                    is_left=is_left,
                 )
 
                 if curr_sign_pose_df is not None:
@@ -203,7 +243,9 @@ class ExtractMultipleVideos:
 
         return all_signs_pose_df
 
-    def __extract_sign_from_video_with_2_person(self, beg_msec: int, end_msec: int, v_part: int, is_left: bool):
+    def __extract_sign_from_video_with_2_person(
+        self, beg_msec: int, end_msec: int, v_part: int, is_left: bool
+    ):
         """
 
         Parameters
@@ -227,20 +269,37 @@ class ExtractMultipleVideos:
         """
 
         row_info = self.all_persons_subtitle[self.all_persons_subtitle.v_part == v_part]
-        curr_id_in_subtitle = row_info.left_person.values[0] if is_left else row_info.right_person.values[0]
+        curr_id_in_subtitle = (
+            row_info.left_person.values[0]
+            if is_left
+            else row_info.right_person.values[0]
+        )
 
         vid_path, vid_name = self.__read_vid_path_from_vpart(v_part, 1)
         vid = cv.VideoCapture(vid_path)
-        res = process_single_sample(extractor=self.extractor, curr_video=vid, beg=beg_msec, end=end_msec,
-                                    person_needed_id=curr_id_in_subtitle,
-                                    # pbar=tqdm(position=2),
-                                    num_gpus=self.gpu_count,
-                                    pose_tracker=self.pose_centroid_tracker)
+        res = process_single_sample(
+            extractor=self.extractor,
+            curr_video=vid,
+            beg=beg_msec,
+            end=end_msec,
+            person_needed_id=curr_id_in_subtitle,
+            # pbar=tqdm(position=2),
+            num_gpus=self.gpu_count,
+            pose_tracker=self.pose_centroid_tracker,
+        )
         vid.release()
         return res
 
-    def __extract_sings_from_single_person_video(self, beg_msec: int, end_msec: int, v_part: int, is_left: bool,
-                                                 pbar: tqdm = None, enable_debug: bool = False, cv_debug: bool = True):
+    def __extract_sings_from_single_person_video(
+        self,
+        beg_msec: int,
+        end_msec: int,
+        v_part: int,
+        is_left: bool,
+        pbar: tqdm = None,
+        enable_debug: bool = False,
+        cv_debug: bool = True,
+    ):
 
         """
 
@@ -260,26 +319,43 @@ class ExtractMultipleVideos:
         def update_df_with_single_pose(dt_, curr_df, curr_person_, curr_msec):
             if enable_debug:
                 if curr_person_ is not None:
-                    cv.circle(dt.cvOutputData, center=tuple(map(int, curr_person_[1][:2])), radius=5, thickness=-1,
-                              color=(255, 128, 0))
+                    cv.circle(
+                        dt.cvOutputData,
+                        center=tuple(map(int, curr_person_[1][:2])),
+                        radius=5,
+                        thickness=-1,
+                        color=(255, 128, 0),
+                    )
 
                 if cv_debug:
-                    cv.imshow('debug', dt.cvOutputData)
+                    cv.imshow("debug", dt.cvOutputData)
                     cv.waitKey(1)
                 else:
-                    plt.imshow(dt.cvOutputData[:, :, :: -1])
+                    plt.imshow(dt.cvOutputData[:, :, ::-1])
                     plt.show()
 
-            curr_person_, person_id_ = ExtractMultipleVideos.get_person_sorted_left_2_right(dt_, is_left, is_body=True)
-            curr_person_hand_, person_id_hand_ = ExtractMultipleVideos.get_person_sorted_left_2_right(dt_, is_left,
-                                                                                                      is_body=False)
+            (
+                curr_person_,
+                person_id_,
+            ) = ExtractMultipleVideos.get_person_sorted_left_2_right(
+                dt_, is_left, is_body=True
+            )
+            (
+                curr_person_hand_,
+                person_id_hand_,
+            ) = ExtractMultipleVideos.get_person_sorted_left_2_right(
+                dt_, is_left, is_body=False
+            )
 
-            v_df = update_xy_pose_df_single_person(dt_, curr_df,
-                                                   int(curr_msec),
-                                                   person_id_,
-                                                   person_id_hand_,
-                                                   all_parts.BODY_PARTS_NAMES,
-                                                   all_parts.HAND_PARTS_NAMES)
+            v_df = update_xy_pose_df_single_person(
+                dt_,
+                curr_df,
+                int(curr_msec),
+                person_id_,
+                person_id_hand_,
+                all_parts.BODY_PARTS_NAMES,
+                all_parts.HAND_PARTS_NAMES,
+            )
 
             if enable_debug and cv_debug:
                 cv.destroyAllWindows()
@@ -288,10 +364,17 @@ class ExtractMultipleVideos:
 
         # Encontrando qual é a pasta/projeto/item que deve ser lido.
         row_vid_sync = self.vid_sync[self.vid_sync.v_part == v_part]
-        if row_vid_sync.left_id.values[0] == -1 or row_vid_sync.right_id.values[0] == -1:
+        if (
+            row_vid_sync.left_id.values[0] == -1
+            or row_vid_sync.right_id.values[0] == -1
+        ):
             return None
 
-        curr_vid_num = row_vid_sync.left_id.values[0] if is_left else row_vid_sync.right_id.values[0]
+        curr_vid_num = (
+            row_vid_sync.left_id.values[0]
+            if is_left
+            else row_vid_sync.right_id.values[0]
+        )
         curr_vid_num += 1
 
         vid_path, vid_name = self.__read_vid_path_from_vpart(v_part, curr_vid_num)
@@ -308,29 +391,41 @@ class ExtractMultipleVideos:
 
         if enable_debug:
             if cv_debug:
-                cv.imshow('debug', dt.cvOutputData)
+                cv.imshow("debug", dt.cvOutputData)
                 cv.waitKey(1)
             else:
-                plt.imshow(dt.cvOutputData[:, :, :: -1])
+                plt.imshow(dt.cvOutputData[:, :, ::-1])
                 plt.show()
 
-        df_cols = ['frame'] + all_parts.BODY_PARTS_NAMES + \
-                  ['left-' + x for x in all_parts.HAND_PARTS_NAMES] + \
-                  ['right-' + x for x in all_parts.HAND_PARTS_NAMES]
+        df_cols = (
+            ["frame"]
+            + all_parts.BODY_PARTS_NAMES
+            + ["left-" + x for x in all_parts.HAND_PARTS_NAMES]
+            + ["right-" + x for x in all_parts.HAND_PARTS_NAMES]
+        )
 
         video_df = pd.DataFrame(columns=df_cols)
 
         curr_msec_pos = vid.get(cv.CAP_PROP_POS_MSEC)
-        curr_person, person_id = ExtractMultipleVideos.get_person_sorted_left_2_right(dt, is_left, is_body=True)
-        curr_person_hand, person_id_hand = ExtractMultipleVideos.get_person_sorted_left_2_right(dt, is_left,
-                                                                                                is_body=False)
+        curr_person, person_id = ExtractMultipleVideos.get_person_sorted_left_2_right(
+            dt, is_left, is_body=True
+        )
+        (
+            curr_person_hand,
+            person_id_hand,
+        ) = ExtractMultipleVideos.get_person_sorted_left_2_right(
+            dt, is_left, is_body=False
+        )
 
-        video_df = update_xy_pose_df_single_person(dt, video_df,
-                                                   int(curr_msec_pos),
-                                                   person_id,
-                                                   person_id_hand,
-                                                   all_parts.BODY_PARTS_NAMES,
-                                                   all_parts.HAND_PARTS_NAMES)
+        video_df = update_xy_pose_df_single_person(
+            dt,
+            video_df,
+            int(curr_msec_pos),
+            person_id,
+            person_id_hand,
+            all_parts.BODY_PARTS_NAMES,
+            all_parts.HAND_PARTS_NAMES,
+        )
 
         if pbar is not None:
             pbar.reset(total=end_msec - beg_msec)
@@ -356,7 +451,9 @@ class ExtractMultipleVideos:
                     frames.append(frame)
                 poses = self.extractor.extract_multiple_gpus(frames)
                 for p, msec in zip(poses, msecs):
-                    video_df = update_df_with_single_pose(p, video_df, curr_person, msec)
+                    video_df = update_df_with_single_pose(
+                        p, video_df, curr_person, msec
+                    )
 
             else:
                 ret, frame = vid.read()
@@ -364,7 +461,9 @@ class ExtractMultipleVideos:
                 if not ret:
                     return None
                 dt: DatumLike = self.extractor.extract_poses(frame)
-                video_df = update_df_with_single_pose(dt, video_df, curr_person, curr_msec_pos)
+                video_df = update_df_with_single_pose(
+                    dt, video_df, curr_person, curr_msec_pos
+                )
 
             curr_msec_pos = vid.get(cv.CAP_PROP_POS_MSEC)
 
@@ -395,12 +494,16 @@ class ExtractMultipleVideos:
         """
         row_info = self.all_persons_subtitle[self.all_persons_subtitle.v_part == v_part]
 
-        folder_complete_path = os.path.join(self.db_path, row_info.folder_name.values[0])
+        folder_complete_path = os.path.join(
+            self.db_path, row_info.folder_name.values[0]
+        )
 
         # ordeno o nome dos videos dentro das pastas, note que cada pasta os videos tem nomes como algo_cam1.mp4,
         # algo_cam2.mp4, e respectivamente o cam1 é o video com 2 pessoas vista lateral, os cam3 e cam2 são
         # rescpetivamente os video com vista de uma pessoa inclinado, e cam4 o vista superior com duas pessoas.
-        vid_path, vid1_name = ExtractMultipleVideos.read_vid_path_from_vpart(folder_complete_path, vid_number)
+        vid_path, vid1_name = ExtractMultipleVideos.read_vid_path_from_vpart(
+            folder_complete_path, vid_number
+        )
 
         return vid_path, vid1_name
 
@@ -409,8 +512,10 @@ class ExtractMultipleVideos:
 
     @staticmethod
     def read_vid_path_from_vpart(folder_complete_path, vid_number):
-        vid1_name = list(filter(lambda x: '.mp4' in x, os.listdir(folder_complete_path)))
-        vid1_name = sorted(vid1_name, key=lambda x: int(x.split('.mp4')[0][-1]))
+        vid1_name = list(
+            filter(lambda x: ".mp4" in x, os.listdir(folder_complete_path))
+        )
+        vid1_name = sorted(vid1_name, key=lambda x: int(x.split(".mp4")[0][-1]))
 
         if vid1_name[vid_number - 1][-5] != str(vid_number):
             return None, None
@@ -421,11 +526,15 @@ class ExtractMultipleVideos:
 
     def unittest_for___extract_sign_from_video_with_2_person(self):
         try:
-            df_p1_side = self.__extract_sign_from_video_with_2_person(5000, 5000 + (1000 * 60), 1098, is_left=True)
-            df_p1_side.to_csv('v1098_side_view_left_person.csv')
+            df_p1_side = self.__extract_sign_from_video_with_2_person(
+                5000, 5000 + (1000 * 60), 1098, is_left=True
+            )
+            df_p1_side.to_csv("v1098_side_view_left_person.csv")
 
-            df_p2_side = self.__extract_sign_from_video_with_2_person(5000, 5000 + (1000 * 60), 1098, is_left=False)
-            df_p2_side.to_csv('v1098_side_view_right_person.csv')
+            df_p2_side = self.__extract_sign_from_video_with_2_person(
+                5000, 5000 + (1000 * 60), 1098, is_left=False
+            )
+            df_p2_side.to_csv("v1098_side_view_right_person.csv")
 
         except BaseException:
             assert False
@@ -433,12 +542,14 @@ class ExtractMultipleVideos:
     def unittest_for___extract_signs_from_single_person_video(self):
 
         try:
-            res1 = self.__extract_sings_from_single_person_video(5000, 5000 + (1000 * 60), 1098, is_left=True,
-                                                                 pbar=tqdm())
-            res2 = self.__extract_sings_from_single_person_video(5000, 5000 + (1000 * 60), 1098, is_left=False,
-                                                                 pbar=tqdm())
-            res1.to_csv('v1098_barely_front_view_left_person.csv')
-            res2.to_csv('v1098_barely_front_view_right_person.csv')
+            res1 = self.__extract_sings_from_single_person_video(
+                5000, 5000 + (1000 * 60), 1098, is_left=True, pbar=tqdm()
+            )
+            res2 = self.__extract_sings_from_single_person_video(
+                5000, 5000 + (1000 * 60), 1098, is_left=False, pbar=tqdm()
+            )
+            res1.to_csv("v1098_barely_front_view_left_person.csv")
+            res2.to_csv("v1098_barely_front_view_right_person.csv")
         except BaseException:
             assert False
 
@@ -474,7 +585,14 @@ class ExtractMultipleVideos:
 
             return valid_poses
 
-        curr_left, curr_right, left_id, right_id, p1, p2 = None, None, None, None, None, None
+        curr_left, curr_right, left_id, right_id, p1, p2 = (
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
 
         curr_pose = dt.poseKeypoints if is_body else dt.handKeypoints[0]
         curr_pose = curr_pose.tolist()
@@ -534,7 +652,7 @@ class ExtractMultipleVideos:
 
         """
 
-        np.seterr(divide='raise', invalid='ignore')
+        np.seterr(divide="raise", invalid="ignore")
         centroid = np.array([0.0, 0.0])
         part_count = 0
         y_max, x_max = 0, 0
@@ -557,65 +675,82 @@ class ExtractMultipleVideos:
                 centroid += body_part[:2]
                 part_count += 1
 
-        centroid = centroid / part_count if centroid[0] != 0 and centroid[1] != 0 and part_count != 0 else None
+        centroid = (
+            centroid / part_count
+            if centroid[0] != 0 and centroid[1] != 0 and part_count != 0
+            else None
+        )
 
         return centroid, (x_min, y_min, x_max, y_max)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     init()
     sign_list = [
         # 'NÃO', 'TER', 'BOM', 'E(esperar)','COMO', 'E(acabar)', 'VER', 'HOMEM', 'PORQUE', 'ESTUDAR'
-        'VER'
+        "VER"
         # 'HOMEM'
     ]
 
     new_sign_list = [
-        'TRABALHAR',
+        "TRABALHAR",
         # 'SABER',
         # 'CERTO',
         # 'OUVIR',
         # 'MÃE',
     ]
 
-    parser = argparse.ArgumentParser(description='All eaf parser')
-    parser.add_argument('--db_path', type=str, help='a path to Libras Corpus',
-                        default='D:/libras corpus b3')
+    parser = argparse.ArgumentParser(description="All eaf parser")
+    parser.add_argument(
+        "--db_path",
+        type=str,
+        help="a path to Libras Corpus",
+        default="D:/libras corpus b3",
+    )
 
-    parser.add_argument('--all_vids', type=str, help='sign df name',
-                        default='all_videos4.csv')
+    parser.add_argument(
+        "--all_vids", type=str, help="sign df name", default="all_videos4.csv"
+    )
 
-    parser.add_argument('--openpose_path', type=str, help='sign df name',
-                        default='C:/Users/lucas/Documents/Projects/Libras/PoseExtractors/openpose')
+    parser.add_argument(
+        "--openpose_path",
+        type=str,
+        help="sign df name",
+        default="C:/Users/lucas/Documents/Projects/Libras/PoseExtractors/openpose",
+    )
 
-    parser.add_argument('--path_to_save_dfs', type=str, help='sign df name',
-                        default='../db/')
+    parser.add_argument(
+        "--path_to_save_dfs", type=str, help="sign df name", default="../db/"
+    )
 
-    parser.add_argument('--gpus', type=int, help='amount of gpus to use',
-                        default=1)
+    parser.add_argument("--gpus", type=int, help="amount of gpus to use", default=1)
 
-    parser.add_argument('--amount_batches', type=int, help='amount of batches',
-                        default=None)
+    parser.add_argument(
+        "--amount_batches", type=int, help="amount of batches", default=None
+    )
 
-    parser.add_argument('--batch', type=int, help='batches',
-                        default=None)
+    parser.add_argument("--batch", type=int, help="batches", default=None)
 
     args = parser.parse_args()
 
-    extractMultipleVideos = ExtractMultipleVideos(db_path=args.db_path,
-                                                  all_videos=args.all_vids,
-                                                  openpose_path=args.openpose_path,
-                                                  vid_sync='vid_sync.csv',
-                                                  gpu_count=args.gpus,
-                                                  # path_to_save_dfs='../sign_db_front_view',
-                                                  path_to_save_dfs=args.path_to_save_dfs,
-                                                  # needed_signs_list=new_sign_list,
-                                                  all_persons_subtitle='all_persons_from_subtitle.csv')
+    extractMultipleVideos = ExtractMultipleVideos(
+        db_path=args.db_path,
+        all_videos=args.all_vids,
+        openpose_path=args.openpose_path,
+        vid_sync="vid_sync.csv",
+        gpu_count=args.gpus,
+        # path_to_save_dfs='../sign_db_front_view',
+        path_to_save_dfs=args.path_to_save_dfs,
+        # needed_signs_list=new_sign_list,
+        all_persons_subtitle="all_persons_from_subtitle.csv",
+    )
 
     try:
-        extractMultipleVideos.process(amount_batchs=args.amount_batches, batch=args.batch)
+        extractMultipleVideos.process(
+            amount_batchs=args.amount_batches, batch=args.batch
+        )
     except:
-        print('LOOOL')
+        print("LOOOL")
     # extractMultipleVideos.unittest_for___extract_sign_from_video_with_2_person()
     # extractMultipleVideos.process()
     # 217 sinais da palavra homem extraidos.

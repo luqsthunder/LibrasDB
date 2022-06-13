@@ -24,7 +24,7 @@ class LSTMClassifier(nn.Module):
             input_size=amount_features,
             batch_first=True,
             hidden_size=self.n_hidden,
-            num_layers=self.n_layers
+            num_layers=self.n_layers,
         )
         self.dense = nn.Linear(self.n_hidden * self.seq_len, amount_classes)
 
@@ -44,11 +44,12 @@ class LSTMClassifier(nn.Module):
         return F.softmax(self.dense(x))
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     batch_size = 8
     epochs = 20
-    db = DBLoader2NPY('../libras-db-folders', batch_size=batch_size,
-                      no_hands=False, angle_pose=False)
+    db = DBLoader2NPY(
+        "../libras-db-folders", batch_size=batch_size, no_hands=False, angle_pose=False
+    )
     db.fill_samples_absent_frames_with_na()
     input_dim = (len(db.joints_used()) - 1) * 2
 
@@ -57,7 +58,9 @@ if __name__ == '__main__':
     optimizer = optim.SGD(model.parameters(), lr=0.1)
     loss = None
 
-    for epoch in range(20):  # again, normally you would NOT do 300 epochs, it is toy data
+    for epoch in range(
+        20
+    ):  # again, normally you would NOT do 300 epochs, it is toy data
         for x_batch, y_batch, sample_weigth in db:
             # Step 1. Remember that Pytorch accumulates gradients.
             # We need to clear them out before each instance
@@ -67,7 +70,9 @@ if __name__ == '__main__':
             # Tensors of word indices.
 
             # Step 3. Run our forward pass.
-            x = torch.from_numpy(np.stack(x_batch, axis=0).reshape((8, 90, 61 * 2))).float()
+            x = torch.from_numpy(
+                np.stack(x_batch, axis=0).reshape((8, 90, 61 * 2))
+            ).float()
             y = torch.from_numpy(np.array([np.argmax(y) for y in y_batch])).long()
 
             model.init_hidden(x.size(0))
@@ -79,4 +84,4 @@ if __name__ == '__main__':
             loss = loss_function(scores, y)
             loss.backward()
             optimizer.step()
-        print('step : ', epoch, 'loss : ', loss.item())
+        print("step : ", epoch, "loss : ", loss.item())

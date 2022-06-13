@@ -1,5 +1,6 @@
 import sys
-sys.path.append('.')
+
+sys.path.append(".")
 
 import math
 import numpy as np
@@ -12,11 +13,24 @@ from tensorflow.keras.utils import Sequence
 
 # libras-db-folders-online-debug
 
-class DBLoaderOnlineSequences:
 
-    def __init__(self, db_path, batch_size, amount_frames_per_sequence=None, joints_2_use=None, angle_pose=False, shuffle=False, add_derivatives=False,
-                 make_k_fold=False, k_fold_amount=None, only_that_classes=None, scaler_cls=None, const_none_angle_rep=0,
-                 const_none_xy_rep=np.array([0, 0, 0])):
+class DBLoaderOnlineSequences:
+    def __init__(
+        self,
+        db_path,
+        batch_size,
+        amount_frames_per_sequence=None,
+        joints_2_use=None,
+        angle_pose=False,
+        shuffle=False,
+        add_derivatives=False,
+        make_k_fold=False,
+        k_fold_amount=None,
+        only_that_classes=None,
+        scaler_cls=None,
+        const_none_angle_rep=0,
+        const_none_xy_rep=np.array([0, 0, 0]),
+    ):
         """
         Parameters
         ----------
@@ -52,7 +66,9 @@ class DBLoaderOnlineSequences:
         self.max_sample_length = None
         self.angle_pose = angle_pose
         self.amount_frames_per_sequence = amount_frames_per_sequence
-        self.samples, self.classes = self._read_all_db_folders_internal(self.db_path, self.only_that_classes)
+        self.samples, self.classes = self._read_all_db_folders_internal(
+            self.db_path, self.only_that_classes
+        )
 
     def _read_all_db_folders_internal(self, db_path, only_that_classes, clean_nan=True):
         """
@@ -69,32 +85,45 @@ class DBLoaderOnlineSequences:
 
         """
 
-        class_dict = {'---PADDING---': 0}
+        class_dict = {"---PADDING---": 0}
         cls_dirs = DBLoader2NPY.get_classes_dir(db_path, only_that_classes)
         samples_loaded = []
         class_names_in_pairs = []
         for it, class_dir in enumerate(cls_dirs):
             # aqui setamos o diretorio interno caso exista um, no caso de não existir seguimos o padrão de: xy_pose
             # para poses completas, angle_pose para as poses com angulos, no_hand-xy_pose para as poses xy sem as mãos.
-            all_samples_in_class = [os.path.join(class_dir, x) for x in os.listdir(class_dir)]
-            only_class_names = class_dir.replace('\\', '/').split('/')[-1].split('---')
+            all_samples_in_class = [
+                os.path.join(class_dir, x) for x in os.listdir(class_dir)
+            ]
+            only_class_names = class_dir.replace("\\", "/").split("/")[-1].split("---")
             for cls in only_class_names:
                 if cls not in class_dict:
                     class_dict.update({cls: len(class_dict)})
 
             for folder_sample in all_samples_in_class:
-                sings_at_folder_sample = [os.path.join(folder_sample, x)
-                                          for x in os.listdir(folder_sample) if '.csv' in x]
+                sings_at_folder_sample = [
+                    os.path.join(folder_sample, x)
+                    for x in os.listdir(folder_sample)
+                    if ".csv" in x
+                ]
                 # os sinais precisam ser ordenados pelo atributo begin ou informação de begin no seu arquivo.
-                sings_at_folder_sample = sorted(sings_at_folder_sample, key=lambda x: x.split('---')[2])
-                classes = [class_dict[x.replace('\\', '/').split('/')[-1].split('---')[1]]
-                           for x in sings_at_folder_sample]
+                sings_at_folder_sample = sorted(
+                    sings_at_folder_sample, key=lambda x: x.split("---")[2]
+                )
+                classes = [
+                    class_dict[x.replace("\\", "/").split("/")[-1].split("---")[1]]
+                    for x in sings_at_folder_sample
+                ]
 
                 sings_at_folder_sample = list(map(pd.read_csv, sings_at_folder_sample))
-                samples_loaded.append(dict(signs=sings_at_folder_sample, classes=classes))
+                samples_loaded.append(
+                    dict(signs=sings_at_folder_sample, classes=classes)
+                )
 
         # achar o sample com maior frames
-        samples_frame = list(map(lambda x: sum([sp.shape[0] for sp in x['signs']]), samples_loaded))
+        samples_frame = list(
+            map(lambda x: sum([sp.shape[0] for sp in x["signs"]]), samples_loaded)
+        )
         max_frame_count = max(samples_frame)
         self.max_sample_length = max_frame_count
 
@@ -103,31 +132,38 @@ class DBLoaderOnlineSequences:
         for sample in samples_loaded:
             x = pd.DataFrame()
             y = []
-            for signs_in_sample, cls in zip(sample['signs'], sample['classes']):
+            for signs_in_sample, cls in zip(sample["signs"], sample["classes"]):
                 x = x.append(signs_in_sample)
                 y.extend([cls] * signs_in_sample.shape[0])
 
-            if 'Unnamed: 0' in x.columns:
-                x = x.drop(['Unnamed: 0'], axis=1)
+            if "Unnamed: 0" in x.columns:
+                x = x.drop(["Unnamed: 0"], axis=1)
 
             samples_join.append(x)
             classes_per_frame.append(y)
 
-        joints_in_use = samples_join[0].keys() if self.joints_2_use is None else self.joints_2_use
+        joints_in_use = (
+            samples_join[0].keys() if self.joints_2_use is None else self.joints_2_use
+        )
         for idx, sample in enumerate(samples_join):
             amount_absent_frames = self.max_sample_length - sample.values.shape[0]
 
             if amount_absent_frames > 0:
-                empty_df = pd.DataFrame({
-                    f: [self.none_rep] * amount_absent_frames
-                    for f in joints_in_use
-                })
+                empty_df = pd.DataFrame(
+                    {f: [self.none_rep] * amount_absent_frames for f in joints_in_use}
+                )
                 samples_join[idx] = empty_df.append(sample)
-                classes_per_frame[idx] = [self.pad_class] * amount_absent_frames + classes_per_frame[idx]
+                classes_per_frame[idx] = [
+                    self.pad_class
+                ] * amount_absent_frames + classes_per_frame[idx]
 
             if not self.angle_pose:
-                samples_join[idx] = samples_join[idx].applymap(DBLoader2NPY.parse_npy_vec_str)
-                samples_join[idx] = samples_join[idx].applymap(lambda c: c[:2] if type(c) is np.ndarray else c)
+                samples_join[idx] = samples_join[idx].applymap(
+                    DBLoader2NPY.parse_npy_vec_str
+                )
+                samples_join[idx] = samples_join[idx].applymap(
+                    lambda c: c[:2] if type(c) is np.ndarray else c
+                )
                 samples_join[idx] = DBLoader2NPY.stack_xy_pose_2_npy(samples_join[idx])
 
         return samples_join, classes_per_frame
@@ -157,11 +193,12 @@ class DBLoaderOnlineSequences:
         m_sample = sample.copy()
 
         if not self.angle_pose:
-            zero_rep = str(np.array([0., 0., 0.]))
+            zero_rep = str(np.array([0.0, 0.0, 0.0]))
             m_sample = m_sample.replace(zero_rep, np.nan)
 
-        return m_sample.fillna(self.const_none_angle_rep
-                               if self.angle_pose else xy_str_rep)
+        return m_sample.fillna(
+            self.const_none_angle_rep if self.angle_pose else xy_str_rep
+        )
 
     def joints_used(self):
         """
@@ -172,7 +209,11 @@ class DBLoaderOnlineSequences:
         joint_names: List
             Lista com nome das juntas utilizadas no carregador.
         """
-        joint_names = self.samples[0][0].keys() if self.joints_2_use is None else self.joints_2_use
+        joint_names = (
+            self.samples[0][0].keys()
+            if self.joints_2_use is None
+            else self.joints_2_use
+        )
         return joint_names
 
     def batch_load_samples(self, samples_idxs, clean_nan=True):
@@ -223,5 +264,5 @@ class InternalKerasSequenceOnlineSequence(Sequence):
     pass
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     DBLoaderOnlineSequences()
