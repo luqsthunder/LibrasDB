@@ -2,6 +2,7 @@ from libras_classifiers.librasdb_loaders import DBLoader2NPY
 from tqdm import tqdm
 import pandas as pd
 
+
 class LibrasImageLoader(DBLoader2NPY):
     """
     Aqui é utilizado a funcionalidade ja presente do DBLoader2NPY para carregar as poses e extrair a imagem relacionada
@@ -19,9 +20,11 @@ class LibrasImageLoader(DBLoader2NPY):
         self.video_db_path = video_db_path
         self.all_videos = pd.read_csv(all_videos_csv_path)
         self.sample_2_video = {}
-        self.video_files= {}
+        self.video_files = {}
 
-    def batch_load_sample(self, samples_idx, as_npy=True, clean_nan=True, pbar: tqdm = None):
+    def batch_load_sample(
+        self, samples_idx, as_npy=True, clean_nan=True, pbar: tqdm = None
+    ):
         X, y = super().batch_load_sample(samples_idx, as_npu=False, clean_nan=False)
         for sample_id in samples_idx:
             pass

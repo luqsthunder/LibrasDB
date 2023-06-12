@@ -1,0 +1,29 @@
+339---HOMEM---101437---101907---2 - estranho - Investigar no Codigo INVESTIGADO CORRIGIDO NAO POSSUIA ERRO.
+340---HOMEM---15580---16475---1 - parado     - Investigar no Codigo INVESTIGADO CORRIGIDO
+417---HOMEM---15580---16475---1 - parado
+420---HOMEM---3760---4100---2 - estranho
+427---HOMEM---57610---59295---2 - estranho
+428---HOMEM---51875---52610---1 - estranho
+492---HOMEM---2490---2870---1 - estranho
+496---HOMEM---800---2280---1 - parado
+633---HOMEM---10075---10825---1 - parado
+781---HOMEM---6730---7797---1 - parado
+801---HOMEM---46200---46840---1 - parado
+810---HOMEM---31872---32142---1 - parado
+849---HOMEM---182300---182847---1 - parado
+874---HOMEM---63145---63695---1 - parado
+582---HOMEM---3810---4440---1 - parado
+801---ESTUDAR---23897---25397---1 - parado
+879---COMO---2540---3170---1 - parado
+849---COMO---43123---43994---1 - parado
+818---COMO---155287---155887---1 - estranho
+584---BOM---141711---142249---2 - parado
+770---BOM---677411---678147---2
+810---BOM---113147---113487---1 - parado
+818---BOM---8308---8619---1
+849---BOM---19503---19911---1 - parado
+866---PORQUE---40410---41880---1 - estranho
+340---VER---124272---124687---1 - parado
+414---VER---850595---851076---1 - parado
+414---VER---953264---954075---1 - parado
+496---VER---81285---81690---1 - parado

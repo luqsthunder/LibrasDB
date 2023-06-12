@@ -1,7 +1,7 @@
 from libras_classifiers.librasdb_loaders import DBLoader2NPY
 from libras_classifiers._librasdb_image_loader import LibrasImageLoader
 
-#import tensorflow as tf
+# import tensorflow as tf
 
 
 class TestDBLoader2npy:
@@ -9,37 +9,48 @@ class TestDBLoader2npy:
     BATCH_SIZE = 8
 
     def setup(self):
-        self.dbxy = DBLoader2NPY('../libras-db-folders-debug',
-                                 batch_size=self.BATCH_SIZE,
-                                 add_derivatives=True,
-                                 angle_pose=False,
-                                 no_hands=False)
+        self.dbxy = DBLoader2NPY(
+            "../libras-db-folders-debug",
+            batch_size=self.BATCH_SIZE,
+            add_derivatives=True,
+            angle_pose=False,
+            no_hands=False,
+        )
 
-        self.db = DBLoader2NPY('../libras-db-folders-debug',
-                               angle_pose=True,
-                               no_hands=False,
-                               batch_size=self.BATCH_SIZE,
-                               make_k_fold=True,
-                               add_derivatives=True,
-                               k_fold_amount=5)
+        self.db = DBLoader2NPY(
+            "../libras-db-folders-debug",
+            angle_pose=True,
+            no_hands=False,
+            batch_size=self.BATCH_SIZE,
+            make_k_fold=True,
+            add_derivatives=True,
+            k_fold_amount=5,
+        )
 
-        self.db_image = LibrasImageLoader('../libras-db-folders-debug',
-                                          batch_size=self.BATCH_SIZE,
-                                          angle_pose=False,
-                                          no_hands=False)
+        self.db_image = LibrasImageLoader(
+            "../libras-db-folders-debug",
+            batch_size=self.BATCH_SIZE,
+            angle_pose=False,
+            no_hands=False,
+        )
 
     def test_constructor(self):
         try:
-            self.db = DBLoader2NPY('../libras-db-folders', angle_pose=False,
-                                   no_hands=False,
-                                   batch_size=self.BATCH_SIZE)
+            self.db = DBLoader2NPY(
+                "../libras-db-folders",
+                angle_pose=False,
+                no_hands=False,
+                batch_size=self.BATCH_SIZE,
+            )
             assert len(self.db.cls_dirs) > 0
             assert len(self.db.samples_path) > 0
 
-            self.dbxy = DBLoader2NPY('../libras-db-folders',
-                                     no_hands=False,
-                                     batch_size=self.BATCH_SIZE,
-                                     angle_pose=False)
+            self.dbxy = DBLoader2NPY(
+                "../libras-db-folders",
+                no_hands=False,
+                batch_size=self.BATCH_SIZE,
+                angle_pose=False,
+            )
             assert len(self.db.cls_dirs) > 0
             assert len(self.db.samples_path) > 0
 
@@ -82,7 +93,9 @@ class TestDBLoader2npy:
     def test_iterator_is_same_value(self):
         try:
             self.db.fill_samples_absent_frames_with_na()
-            res_non_npy = self.db.batch_load_samples(list(range(self.BATCH_SIZE)), as_npy=False)
+            res_non_npy = self.db.batch_load_samples(
+                list(range(self.BATCH_SIZE)), as_npy=False
+            )
             res = self.db[0]
 
         except BaseException:
